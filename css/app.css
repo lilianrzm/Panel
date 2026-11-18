@@ -436,3 +436,6 @@ legend { padding: 0 6px; font-weight: 700; color: var(--primary); font-size: 14p
 .icon-toggle { width: 38px; height: 38px; border-radius: 9px; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
 .icon-toggle:hover { color: var(--primary); border-color: var(--primary); }
 .icon-toggle svg { width: 20px; height: 20px; }
+
+.map-area circle.heat-dot { cursor: pointer; opacity: .92; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+.map-area text.heat-dot-label { font-weight: 700; pointer-events: none; font-family: -apple-system, sans-serif; }

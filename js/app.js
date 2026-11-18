@@ -23,7 +23,7 @@
   ];
   const PALETTE = ['#2563eb', '#d97706', '#059669', '#db2777', '#7c3aed', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#be123c'];
   const GRAY = '#94a3b8';
-  const APP_VERSION = '7 · 18/11/2026';
+  const APP_VERSION = '8 · 18/11/2026';
   const DEFAULT_NAME = 'Gestor-S';
   const PREFS_KEY = 'panel.prefs';
   const LOCK_WHEN_HIDDEN_MS = 30 * 1000;
@@ -1195,8 +1195,16 @@
     });
     return groups;
   }
+  // Si no cargaste otra, se usa la cartografía de secciones incluida en la app (INE, municipio de Chihuahua)
+  const BUILTIN_CARTO = { seccion: 'data/secciones-chihuahua.geojson' };
   async function getCarto(view) {
-    if (!(view in cartoCache)) cartoCache[view] = await MapaGeo.store.get(view);
+    if (!(view in cartoCache)) {
+      let geo = await MapaGeo.store.get(view);
+      if (!geo && BUILTIN_CARTO[view]) {
+        try { geo = await (await fetch(BUILTIN_CARTO[view])).json(); geo._builtin = true; } catch (e) { geo = null; }
+      }
+      cartoCache[view] = geo;
+    }
     return cartoCache[view];
   }
 
@@ -1213,7 +1221,7 @@
     const geo = await getCarto(view);
     const onSelect = key => { ui.mapSelected = key; showMapDetail(groups[key], view, key); };
     if (geo) {
-      const r = MapaGeo.renderChoropleth(area, geo, view, groups, { selected: ui.mapSelected, onSelect });
+      const r = MapaGeo.renderChoropleth(area, geo, view, groups, { selected: ui.mapSelected, onSelect, keepView: ui.mapView || (ui.mapView = {}) });
       $('mapLegend').innerHTML = `<span>Menos</span><span class="legend-bar"></span><span>Más gestiones</span>` +
         (r.unmatched ? `<span>· ${r.unmatched} ${r.unmatched === 1 ? 'zona con gestiones no aparece' : 'zonas con gestiones no aparecen'} en la cartografía (revisa cómo está escrita).</span>` : '');
     } else {
@@ -1503,7 +1511,7 @@
       .forEach(([id, k]) => { $(id).value = (c[k] || []).join('\n'); });
     renderBioStatus();
     const [sec, col] = await Promise.all([getCarto('seccion'), getCarto('colonia')]);
-    $('cfgCartoStatus').textContent = `${sec ? `Secciones: ${sec.features.length} zonas cargadas.` : 'Secciones: sin cargar.'} ${col ? `Colonias: ${col.features.length} zonas cargadas.` : 'Colonias: sin cargar.'}`;
+    $('cfgCartoStatus').textContent = `${sec ? `Secciones: ${sec.features.length} zonas${sec._builtin ? ' (incluidas en la app: municipio de Chihuahua, INE)' : ' cargadas'}.` : 'Secciones: sin cargar.'} ${col ? `Colonias: ${col.features.length} zonas cargadas.` : 'Colonias: sin cargar.'}`;
   }
 
   async function renderBioStatus() {
@@ -1735,6 +1743,16 @@
     });
     $('gestionForm').addEventListener('submit', saveGestion);
     $('fCurp').addEventListener('input', checkCurp);
+    // Si la colonia ya tiene gestiones con sección, se sugiere esa sección
+    $('fColonia').addEventListener('change', () => {
+      if ($('fSeccion').value.trim()) return;
+      const k = MapaGeo.normColonia($('fColonia').value);
+      if (!k) return;
+      const c = {};
+      data.gestiones.forEach(g => { if (g.seccion && MapaGeo.normColonia(g.colonia) === k) c[g.seccion] = (c[g.seccion] || 0) + 1; });
+      const best = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+      if (best) { $('fSeccion').value = best[0]; toast(`Sección ${best[0]} sugerida por la colonia (puedes cambiarla).`); }
+    });
     $('gDeleteBtn').addEventListener('click', () => { if (ui.editingGestion) deleteGestion(ui.editingGestion.id); });
     $('gScheduleBtn').addEventListener('click', () => {
       const g = ui.editingGestion;
