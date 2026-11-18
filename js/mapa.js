@@ -212,7 +212,7 @@ const MapaGeo = (() => {
 
     // Puntos de calor: un círculo por zona con gestiones (se ven aunque la zona sea pequeña)
     const gb = document.createElementNS(NS, 'g');
-    built.shapes.filter(s => s._t !== undefined && counts[featureKey(s.feature, view).key]).forEach(s => {
+    built.shapes.filter(s => opts.dots && s._t !== undefined && counts[featureKey(s.feature, view).key]).forEach(s => {
       const { key, label } = featureKey(s.feature, view);
       const c = counts[key];
       const t = c.total / max;
@@ -227,9 +227,9 @@ const MapaGeo = (() => {
       title.textContent = `${view === 'seccion' ? 'Sección ' : view === 'zona' ? 'Zona ' : ''}${label}: ${c.total} gestiones`;
       circ.appendChild(title);
       gb.appendChild(circ);
-      const rpx = 7 + 13 * Math.sqrt(t);
+      const rpx = 5 + 9 * Math.sqrt(t);
       let txt = null;
-      if (rpx >= 10) {
+      if (false) { // sin número en el mapa: el detalle sale al tocar
         txt = document.createElementNS(NS, 'text');
         txt.setAttribute('x', cx); txt.setAttribute('y', cy);
         txt.setAttribute('text-anchor', 'middle');

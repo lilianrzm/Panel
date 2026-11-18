@@ -461,3 +461,4 @@ legend { padding: 0 6px; font-weight: 700; color: var(--primary); font-size: 14p
 .combo.clearable .input { padding-right: 40px; }
 .combo-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--surface-2); color: var(--muted); font-size: 14px; cursor: pointer; }
 .combo-clear:hover { color: var(--st-cancelado); }
+.map-area path.selected { stroke: var(--text); stroke-width: 3; filter: drop-shadow(0 0 4px rgba(0,0,0,.35)); }
