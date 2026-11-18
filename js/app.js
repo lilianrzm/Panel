@@ -23,7 +23,7 @@
   ];
   const PALETTE = ['#2563eb', '#d97706', '#059669', '#db2777', '#7c3aed', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#be123c'];
   const GRAY = '#94a3b8';
-  const APP_VERSION = '10 · 18/11/2026';
+  const APP_VERSION = '11 · 18/11/2026';
   const DEFAULT_NAME = 'Gestor-S';
   const PREFS_KEY = 'panel.prefs';
   const LOCK_WHEN_HIDDEN_MS = 30 * 1000;
@@ -1318,7 +1318,16 @@
     return cartoCache[view];
   }
 
+  function heatPalette() { return getPrefs().heat || 'verde'; }
+  function legendHtml(extra = '') {
+    const cur = heatPalette();
+    return `<span>Menos</span><span class="legend-bar" style="background:${MapaGeo.gradient(cur)}"></span><span>Más gestiones</span>${extra}
+      <span class="pal-picker"><span class="muted">Colores:</span>${Object.entries(MapaGeo.PALETTES).map(([id, p]) =>
+        `<button type="button" class="pal-btn${id === cur ? ' active' : ''}" data-pal="${id}" title="${esc(p.label)}" aria-label="Colores: ${esc(p.label)}" style="background:${MapaGeo.gradient(id)}"></button>`).join('')}</span>`;
+  }
+
   async function renderMapa() {
+    MapaGeo.setPalette(heatPalette());
     fillSelect($('mEstatus'), ESTATUS, { all: 'Todos los estados', extraFirst: ESTADO_FILTER_EXTRA });
     fillSelect($('mResponsable'), respOptions(), { all: 'Todos los responsables' });
     fillSelect($('mDependencia'), catalogOptions('dependencias', 'dependencia'), { all: 'Todas las dependencias' });
@@ -1348,15 +1357,14 @@
     renderUnplaced(view);
     if (geo) {
       const r = MapaGeo.renderChoropleth(area, geo, view, groups, { selected: ui.mapSelected, onSelect, keepView: ui.mapView || (ui.mapView = {}) });
-      $('mapLegend').innerHTML = `<span>Menos</span><span class="legend-bar"></span><span>Más gestiones</span>` +
-        (r.unmatched ? `<span>· ${r.unmatched} ${r.unmatched === 1 ? 'zona con gestiones no aparece' : 'zonas con gestiones no aparecen'} en la cartografía (revisa cómo está escrita).</span>` : '');
+      $('mapLegend').innerHTML = legendHtml(r.unmatched ? `<span>· ${r.unmatched} ${r.unmatched === 1 ? 'zona con gestiones no aparece' : 'zonas con gestiones no aparecen'} en la cartografía.</span>` : '');
     } else {
       const items = Object.values(groups).map(gp => ({ key: gp.key, label: gp.label, count: gp.total })).sort((a, b) => b.count - a.count);
       MapaGeo.renderGrid(area, items, {
         esc, selected: ui.mapSelected, onSelect,
         message: `Vista de calor por ${view === 'seccion' ? 'sección' : 'colonia'}. Para ver el mapa con contornos, carga la cartografía de ${view === 'seccion' ? 'secciones' : 'colonias'} en Configuración.`
       });
-      $('mapLegend').innerHTML = '<span>Menos</span><span class="legend-bar"></span><span>Más gestiones</span>';
+      $('mapLegend').innerHTML = legendHtml();
     }
     if (ui.mapSelected) showMapDetail(groups[ui.mapSelected] || null, view, ui.mapSelected);
     else $('mapDetail').innerHTML = '<p class="muted">Toca una zona del mapa para ver sus gestiones.</p>';
@@ -1845,6 +1853,14 @@
         toast(`“${col}” quedó en la ${zona ? 'zona CP' : 'sección'} ${sec}.`);
         renderMapa();
       }
+    });
+    $('mapLegend').addEventListener('click', e => {
+      const b = e.target.closest('[data-pal]');
+      if (!b) return;
+      const p = getPrefs();
+      p.heat = b.dataset.pal;
+      localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+      renderMapa();
     });
     $('assignCancel').addEventListener('click', () => { ui.assignColonia = null; renderMapa(); });
     $('cfgColSecImport').addEventListener('change', e => { importColSec(e.target.files[0]); e.target.value = ''; });

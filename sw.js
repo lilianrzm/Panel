@@ -1,7 +1,7 @@
 /* Service worker: guarda la app en el iPad para que funcione sin internet.
    Solo guarda los archivos de la app; tus datos nunca pasan por aquí.
    Con internet siempre trae la versión más nueva; sin internet usa la guardada. */
-const CACHE = 'panel-v10';
+const CACHE = 'panel-v11';
 const FILES = [
   './',
   'index.html',

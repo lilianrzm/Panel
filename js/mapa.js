@@ -31,7 +31,21 @@ const MapaGeo = (() => {
   };
 
   // ---------- Utilidades ----------
-  const STOPS = [[255, 241, 193], [255, 193, 7], [253, 126, 20], [220, 53, 69], [127, 29, 29]];
+  // Paletas del mapa de calor (de menos a más gestiones)
+  const PALETTES = {
+    verde: { label: 'Verde', stops: [[229, 245, 224], [161, 217, 155], [65, 171, 93], [0, 109, 44], [0, 68, 27]] },
+    calor: { label: 'Amarillo a rojo', stops: [[255, 241, 193], [255, 193, 7], [253, 126, 20], [220, 53, 69], [127, 29, 29]] },
+    azul: { label: 'Azul', stops: [[222, 235, 247], [158, 202, 225], [66, 146, 198], [8, 81, 156], [8, 48, 107]] },
+    morado: { label: 'Morado', stops: [[239, 237, 245], [188, 189, 220], [128, 125, 186], [84, 39, 143], [63, 0, 125]] },
+    guinda: { label: 'Guinda', stops: [[252, 235, 240], [238, 178, 194], [204, 102, 133], [140, 35, 70], [90, 12, 40]] },
+    naranja: { label: 'Naranja', stops: [[254, 237, 222], [253, 190, 133], [253, 141, 60], [217, 71, 1], [140, 45, 4]] }
+  };
+  let STOPS = PALETTES.verde.stops;
+  function setPalette(id) { STOPS = (PALETTES[id] || PALETTES.verde).stops; }
+  function gradient(id) {
+    const st = (PALETTES[id] || { stops: STOPS }).stops;
+    return `linear-gradient(90deg, ${st.map(c => `rgb(${c.join(',')})`).join(', ')})`;
+  }
   function heatColor(t) {
     if (!(t > 0)) return null;
     t = Math.max(0, Math.min(1, t));
@@ -321,5 +335,5 @@ const MapaGeo = (() => {
     }));
   }
 
-  return { store, heatColor, normColonia, normSeccion, normCp, validateGeo, renderChoropleth, renderGrid };
+  return { store, heatColor, normColonia, normSeccion, normCp, validateGeo, renderChoropleth, renderGrid, PALETTES, setPalette, gradient };
 })();
