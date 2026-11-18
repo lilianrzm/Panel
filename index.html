@@ -59,6 +59,8 @@
 
       <!-- Desbloquear -->
       <form id="unlockForm" class="hidden" autocomplete="off">
+        <button type="button" class="btn btn-primary btn-block btn-bio hidden" id="bioBtn">👆 Entrar con huella / Face ID</button>
+        <p class="lock-or hidden" id="bioOr">o con tu contraseña</p>
         <div class="form-group">
           <label for="unlockPass">Contraseña</label>
           <input type="password" id="unlockPass" autocomplete="current-password">
@@ -104,22 +106,34 @@
 
       <!-- INICIO -->
       <section class="section active" id="dashboard">
-        <div class="cards" id="statusCards"></div>
+        <div class="cards" id="taskCards"></div>
         <div class="grid-2">
           <div class="panel">
-            <h3 class="panel-title">Gestiones por estatus</h3>
-            <p class="panel-hint">Toca una barra para ver esas gestiones.</p>
-            <canvas id="statusChart" class="chart"></canvas>
+            <h3 class="panel-title">Tareas por estado</h3>
+            <p class="panel-hint">Toca una parte del círculo o de la lista para ver esas gestiones.</p>
+            <div class="donut-wrap"><canvas id="donutEstado" class="donut"></canvas><ul class="donut-legend" id="legendEstado"></ul></div>
           </div>
+          <div class="panel">
+            <h3 class="panel-title">Tareas por responsable</h3>
+            <p class="panel-hint">Toca una parte del círculo o de la lista para ver sus gestiones.</p>
+            <div class="donut-wrap"><canvas id="donutResp" class="donut"></canvas><ul class="donut-legend" id="legendResp"></ul></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h3 class="panel-title">Tareas por responsable y estado</h3>
+          <div class="bar-legend" id="barLegend"></div>
+          <div class="bars" id="respBars"></div>
+        </div>
+        <div class="grid-2">
           <div class="panel">
             <h3 class="panel-title">Zonas con más gestiones</h3>
             <p class="panel-hint">Toca un punto rojo para ver el mapa de calor y el reporte de esa colonia.</p>
             <ul class="hot-list" id="hotList"></ul>
           </div>
-        </div>
-        <div class="panel">
-          <h3 class="panel-title">Próximos eventos</h3>
-          <ul class="agenda-list" id="dashAgenda"></ul>
+          <div class="panel">
+            <h3 class="panel-title">Próximos eventos</h3>
+            <ul class="agenda-list" id="dashAgenda"></ul>
+          </div>
         </div>
         <div class="notice hidden" id="noLocationNotice"></div>
       </section>
@@ -130,8 +144,9 @@
           <div class="toolbar">
             <input type="search" class="input" id="gSearch" placeholder="Buscar por nombre, colonia, folio…">
             <select class="input" id="gFilterEstatus"></select>
+            <select class="input" id="gFilterResponsable"></select>
             <select class="input" id="gFilterDependencia"></select>
-            <select class="input" id="gFilterFuente"></select>
+            <select class="input" id="gFilterPrioridad"></select>
             <label class="check"><input type="checkbox" id="gFilterSinUbicacion"> Sin ubicación</label>
             <button class="btn btn-primary" data-action="new-gestion">＋ Nueva gestión</button>
           </div>
@@ -139,8 +154,8 @@
             <table class="table">
               <thead>
                 <tr>
-                  <th>Folio</th><th>Solicitante</th><th>Dependencia</th><th>Fuente</th>
-                  <th>Ubicación</th><th>Estatus</th><th>Fechas</th><th class="num">Monto</th><th></th>
+                  <th>Folio</th><th>Solicitante</th><th>Responsable</th><th>Dependencia</th><th>Prioridad</th>
+                  <th>Ubicación</th><th>Estado</th><th>Fechas</th>
                 </tr>
               </thead>
               <tbody id="gTableBody"></tbody>
@@ -159,9 +174,10 @@
               <option value="colonia">Vista por colonia</option>
             </select>
             <select class="input" id="mEstatus"></select>
-            <select class="input" id="mFuente"></select>
+            <select class="input" id="mResponsable"></select>
             <select class="input" id="mDependencia"></select>
-            <select class="input" id="mTipo"></select>
+            <select class="input" id="mMedio"></select>
+            <select class="input" id="mFuente"></select>
             <label class="inline-label">Desde <input type="date" class="input" id="mDesde"></label>
             <label class="inline-label">Hasta <input type="date" class="input" id="mHasta"></label>
           </div>
@@ -202,20 +218,25 @@
           <div class="filter-grid">
             <label>Desde<input type="date" class="input" id="rDesde"></label>
             <label>Hasta<input type="date" class="input" id="rHasta"></label>
-            <label>Fuente de ingreso<select class="input" id="rFuente"></select></label>
+            <label>Estado<select class="input" id="rEstatus"></select></label>
+            <label>Responsable<select class="input" id="rResponsable"></select></label>
             <label>Dependencia<select class="input" id="rDependencia"></select></label>
-            <label>Tipo de gestión<select class="input" id="rTipo"></select></label>
+            <label>Prioridad<select class="input" id="rPrioridad"></select></label>
+            <label>Medio de recepción<select class="input" id="rMedio"></select></label>
+            <label>Fuente de ingreso<select class="input" id="rFuente"></select></label>
             <label>Colonia<select class="input" id="rColonia"></select></label>
             <label>Municipio<select class="input" id="rMunicipio"></select></label>
-            <label>Estatus<select class="input" id="rEstatus"></select></label>
             <label>Agrupar por
               <select class="input" id="rGroup">
+                <option value="estatus">Estado</option>
+                <option value="responsable">Responsable</option>
+                <option value="dependencia">Dependencia</option>
+                <option value="prioridad">Prioridad</option>
                 <option value="colonia">Colonia</option>
                 <option value="seccion">Sección</option>
+                <option value="medio">Medio de recepción</option>
                 <option value="fuente">Fuente de ingreso</option>
-                <option value="dependencia">Dependencia</option>
-                <option value="tipo">Tipo de gestión</option>
-                <option value="estatus">Estatus</option>
+                <option value="tipo">Tipo de apoyo</option>
                 <option value="municipio">Municipio</option>
               </select>
             </label>
@@ -236,8 +257,8 @@
             <table class="table">
               <thead>
                 <tr>
-                  <th>Folio</th><th>Solicitante</th><th>Dependencia</th><th>Tipo</th><th>Fuente</th>
-                  <th>Colonia</th><th>Sección</th><th>Estatus</th><th>Ingreso</th><th class="num">Monto</th>
+                  <th>Folio</th><th>Solicitante</th><th>Responsable</th><th>Dependencia</th><th>Prioridad</th>
+                  <th>Colonia</th><th>Estado</th><th>Ingreso</th><th>Límite</th><th class="num">Monto</th>
                 </tr>
               </thead>
               <tbody id="rTableBody"></tbody>
@@ -285,6 +306,16 @@
           </div>
 
           <div class="panel">
+            <h3 class="panel-title">Entrar con huella / Face ID</h3>
+            <p class="muted" id="cfgBioStatus"></p>
+            <div class="actions">
+              <button class="btn btn-primary" id="cfgBioEnable">👆 Activar</button>
+              <button class="btn btn-primary hidden" id="cfgBioConfirm">👆 Confirmar con tu huella</button>
+              <button class="btn btn-outline hidden" id="cfgBioDisable">Desactivar</button>
+            </div>
+          </div>
+
+          <div class="panel">
             <h3 class="panel-title">Cambiar contraseña</h3>
             <div class="form-group"><label for="cfgOldPass">Contraseña actual</label><input type="password" class="input" id="cfgOldPass" autocomplete="current-password"></div>
             <div class="form-group"><label for="cfgNewPass">Nueva contraseña (mínimo 8)</label><input type="password" class="input" id="cfgNewPass" autocomplete="new-password"></div>
@@ -311,11 +342,13 @@
         <div class="panel">
           <h3 class="panel-title">Catálogos</h3>
           <p class="muted">Una opción por línea. Lo que cambies aquí aparece en las listas de captura, filtros y reportes.</p>
-          <div class="grid-4">
-            <div class="form-group"><label for="catDependencias">Dependencias</label><textarea class="input" id="catDependencias" rows="10"></textarea></div>
-            <div class="form-group"><label for="catTipos">Tipos de gestión</label><textarea class="input" id="catTipos" rows="10"></textarea></div>
-            <div class="form-group"><label for="catFuentes">Fuentes de ingreso</label><textarea class="input" id="catFuentes" rows="10"></textarea></div>
-            <div class="form-group"><label for="catMunicipios">Municipios</label><textarea class="input" id="catMunicipios" rows="10"></textarea></div>
+          <div class="grid-3">
+            <div class="form-group"><label for="catDependencias">Dependencias</label><textarea class="input" id="catDependencias" rows="12"></textarea></div>
+            <div class="form-group"><label for="catResponsables">Responsables (tu equipo)</label><textarea class="input" id="catResponsables" rows="12"></textarea></div>
+            <div class="form-group"><label for="catMedios">Medios de recepción</label><textarea class="input" id="catMedios" rows="12"></textarea></div>
+            <div class="form-group"><label for="catFuentes">Fuentes de ingreso</label><textarea class="input" id="catFuentes" rows="12"></textarea></div>
+            <div class="form-group"><label for="catTipos">Tipos de apoyo (solo sugerencias)</label><textarea class="input" id="catTipos" rows="12"></textarea></div>
+            <div class="form-group"><label for="catMunicipios">Municipios (solo sugerencias)</label><textarea class="input" id="catMunicipios" rows="12"></textarea></div>
           </div>
           <button class="btn btn-primary" id="cfgSaveCatalogs">Guardar catálogos</button>
         </div>
@@ -331,37 +364,55 @@
         <button class="icon-btn" data-close aria-label="Cerrar">✕</button>
       </div>
       <form id="gestionForm" autocomplete="off">
+        <div class="form-group"><label for="fResponsable">Responsable</label><input class="input" id="fResponsable" list="responsablesList" placeholder="Persona de tu equipo que atiende"></div>
         <fieldset>
           <legend>Datos del solicitante</legend>
           <div class="form-row">
-            <div class="form-group"><label for="fSolicitante">Nombre</label><input class="input" id="fSolicitante"></div>
-            <div class="form-group"><label for="fTelefono">Teléfono</label><input class="input" id="fTelefono" type="tel"></div>
+            <div class="form-group"><label for="fSolicitante">Nombre completo</label><input class="input" id="fSolicitante" autocapitalize="words"></div>
+            <div class="form-group"><label for="fCurp">CURP</label><input class="input" id="fCurp" maxlength="18" autocapitalize="characters" spellcheck="false"><small class="field-hint" id="curpHint"></small></div>
           </div>
           <div class="form-row three">
-            <div class="form-group"><label for="fMunicipio">Municipio</label><select class="input" id="fMunicipio"></select></div>
-            <div class="form-group"><label for="fColonia">Colonia</label><input class="input" id="fColonia" list="coloniasList"></div>
+            <div class="form-group"><label for="fColonia">Colonia domicilio</label><input class="input" id="fColonia" list="coloniasList"></div>
             <div class="form-group"><label for="fSeccion">Sección</label><input class="input" id="fSeccion" inputmode="numeric" list="seccionesList"></div>
+            <div class="form-group"><label for="fMunicipio">Municipio</label><input class="input" id="fMunicipio" list="municipiosList"></div>
+          </div>
+          <div class="form-row three">
+            <div class="form-group"><label for="fTelefono">Teléfono</label><input class="input" id="fTelefono" type="tel"></div>
+            <div class="form-group"><label for="fMedio">Medio de recepción</label><select class="input" id="fMedio"></select></div>
+            <div class="form-group"><label for="fFechaIngreso">Fecha de ingreso</label><input class="input" id="fFechaIngreso" type="date"></div>
           </div>
         </fieldset>
         <fieldset>
-          <legend>Datos de la gestión</legend>
+          <legend>Descripción de la solicitud</legend>
           <div class="form-row">
-            <div class="form-group"><label for="fDependencia">Dependencia</label><select class="input" id="fDependencia"></select></div>
-            <div class="form-group"><label for="fTipo">Tipo de gestión</label><select class="input" id="fTipo"></select></div>
-          </div>
-          <div class="form-row three">
-            <div class="form-group"><label for="fFuente">Fuente de ingreso</label><select class="input" id="fFuente"></select></div>
+            <div class="form-group"><label for="fTipo">Tipo de apoyo o petición</label><input class="input" id="fTipo" list="tiposList"></div>
             <div class="form-group"><label for="fMonto">Monto estimado ($)</label><input class="input" id="fMonto" type="number" step="0.01" min="0" inputmode="decimal"></div>
-            <div class="form-group"><label for="fEstatus">Estatus</label><select class="input" id="fEstatus"></select></div>
+          </div>
+          <div class="form-group"><label for="fDescripcion">Detalle del problema</label><textarea class="input" id="fDescripcion" rows="3"></textarea></div>
+        </fieldset>
+        <fieldset>
+          <legend>Clasificación</legend>
+          <div class="form-row three">
+            <div class="form-group"><label for="fPrioridad">Prioridad</label><select class="input" id="fPrioridad"></select></div>
+            <div class="form-group"><label for="fDependencia">Dependencia responsable</label><select class="input" id="fDependencia"></select></div>
+            <div class="form-group"><label for="fFuente">Fuente de ingreso</label><select class="input" id="fFuente"></select></div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Seguimiento</legend>
+          <div class="form-row">
+            <div class="form-group"><label for="fPrimerContacto">Primer contacto</label><input class="input" id="fPrimerContacto" type="date"></div>
+            <div class="form-group"><label for="fEstatus">Estado actual</label><select class="input" id="fEstatus"></select></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label for="fFechaIngreso">Fecha de ingreso</label><input class="input" id="fFechaIngreso" type="date"></div>
+            <div class="form-group"><label for="fFechaLimite">Fecha límite</label><input class="input" id="fFechaLimite" type="date"></div>
             <div class="form-group"><label>Última actualización</label><input class="input" id="fFechaAct" disabled></div>
           </div>
-          <div class="form-group"><label for="fDescripcion">Descripción</label><textarea class="input" id="fDescripcion" rows="3"></textarea></div>
+          <div class="form-group"><label for="fObservaciones">Observaciones</label><textarea class="input" id="fObservaciones" rows="3"></textarea></div>
         </fieldset>
         <div class="linked hidden" id="gLinkedEvents"></div>
         <div class="modal-actions">
+          <button type="button" class="btn btn-danger hidden" id="gDeleteBtn">🗑 Eliminar</button>
           <button type="button" class="btn btn-outline hidden" id="gScheduleBtn">📅 Agendar evento</button>
           <span class="spacer"></span>
           <button type="button" class="btn btn-outline" data-close>Cancelar</button>
@@ -423,6 +474,9 @@
   <div id="printArea" class="print-area"></div>
 
   <datalist id="coloniasList"></datalist>
+  <datalist id="responsablesList"></datalist>
+  <datalist id="tiposList"></datalist>
+  <datalist id="municipiosList"></datalist>
   <datalist id="seccionesList"></datalist>
 
   <script src="js/vault.js"></script>

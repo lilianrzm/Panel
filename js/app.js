@@ -5,11 +5,15 @@
   // ================= Constantes =================
   const ESTATUS = [
     { id: 'capturado', label: 'Capturado' },
-    { id: 'revision', label: 'En Revisión' },
+    { id: 'curso', label: 'En curso' },
+    { id: 'detenido', label: 'Detenido' },
     { id: 'terminado', label: 'Terminado' },
     { id: 'cancelado', label: 'Cancelado' }
   ];
   const ESTATUS_LABEL = Object.fromEntries(ESTATUS.map(e => [e.id, e.label]));
+  const CERRADOS = ['terminado', 'cancelado'];
+  const PRIORIDADES = [{ id: 'alta', label: 'Alta' }, { id: 'media', label: 'Media' }, { id: 'baja', label: 'Baja' }];
+  const PRIORIDAD_LABEL = Object.fromEntries(PRIORIDADES.map(p => [p.id, p.label]));
   const THEMES = [
     { id: 'azul', label: 'Azul institucional', color: '#1f3a5f' },
     { id: 'guinda', label: 'Guinda', color: '#691c32' },
@@ -17,41 +21,65 @@
     { id: 'gris', label: 'Gris neutro', color: '#3f4752' },
     { id: 'oscuro', label: 'Modo oscuro', color: '#11161d' }
   ];
+  const PALETTE = ['#2563eb', '#d97706', '#059669', '#db2777', '#7c3aed', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#be123c'];
+  const GRAY = '#94a3b8';
   const DEFAULT_NAME = 'Gestor-S';
   const PREFS_KEY = 'panel.prefs';
   const LOCK_WHEN_HIDDEN_MS = 30 * 1000;
   const BACKUP_REMINDER_DAYS = 7;
+  const SCHEMA = 2;
 
-  const DEFAULT_CATALOGOS = {
-    dependencias: [
-      'Dirección de Obras Públicas',
-      'Dirección de Mantenimiento Urbano',
-      'Dirección de Servicios Públicos',
-      'Dirección de Seguridad Pública',
-      'Dirección de Desarrollo Humano y Educación',
-      'Dirección de Desarrollo Urbano y Ecología',
-      'DIF Municipal',
-      'Tesorería Municipal',
-      'Coordinación de Medio Ambiente y Protección Animal',
-      'Coordinación de Participación Ciudadana',
-      'Gobierno del Estado',
-      'Otra'
-    ],
-    tipos: ['Servicios Públicos', 'Obra Pública', 'Seguridad', 'Desarrollo Social', 'Apoyo', 'Comercio', 'Otro'],
-    fuentes: ['Web', 'WhatsApp', 'Presencial', 'Teléfono', 'Recorrido'],
-    municipios: ['Chihuahua', 'Aldama', 'Aquiles Serdán', 'Juárez', 'Cuauhtémoc', 'Delicias', 'Hidalgo del Parral', 'Otro']
-  };
+  const DEPENDENCIAS = [
+    'Presidencia Municipal',
+    'Coordinación de Comunicación Social',
+    'Coordinación de Participación Ciudadana',
+    'Coordinación de Medio Ambiente y Protección Animal',
+    'Coordinación de Relaciones Públicas',
+    'Coordinación de Transparencia, Gobierno Abierto y Archivos',
+    'Dirección de Desarrollo Económico y Competitividad',
+    'Dirección de Desarrollo Humano y Educación',
+    'Dirección de Desarrollo Rural',
+    'Dirección de Desarrollo Urbano y Ecología',
+    'Dirección de Mantenimiento Urbano',
+    'Dirección de Obras Públicas',
+    'Dirección de Planeación e Innovación Gubernamental',
+    'Dirección de Seguridad Pública Municipal',
+    'Dirección de Servicios Públicos Municipales',
+    'Dirección del Órgano Interno de Control',
+    'Oficialía Mayor',
+    'Secretaría del H. Ayuntamiento',
+    'Sindicatura',
+    'Tesorería Municipal',
+    'Consejo de Urbanización Municipal',
+    'Desarrollo Integral de la Familia',
+    'Instituto de Cultura del Municipio',
+    'Instituto de Planeación Integral del Municipio de Chihuahua',
+    'Instituto Municipal de Cultura Física y Deporte',
+    'Instituto Municipal de las Mujeres',
+    'Instituto Municipal de Pensiones',
+    'Instituto Municipal de Prevención y Atención a la Salud',
+    'Gobierno del Estado'
+  ];
+  const MEDIOS = ['Recorrido en colonia', 'Redes sociales oficiales', 'Atención directa en oficina', 'Llamada telefónica', 'Evento público'];
+  const FUENTES = ['Alcalde', 'Despacho', 'Coordinación de Gobernanzas', 'Regidores', 'Diputados', 'Redes sociales'];
+  const TIPOS = ['Servicios públicos', 'Obra pública', 'Seguridad', 'Desarrollo social', 'Apoyo económico', 'Trámite', 'Otro'];
+  const MUNICIPIOS = ['Chihuahua', 'Aldama', 'Aquiles Serdán', 'Juárez', 'Cuauhtémoc', 'Delicias', 'Hidalgo del Parral'];
+
+  // Versión anterior (para migrar sin perder lo que hayas agregado)
+  const OLD_DEPENDENCIAS = ['Dirección de Obras Públicas', 'Dirección de Mantenimiento Urbano', 'Dirección de Servicios Públicos', 'Dirección de Seguridad Pública', 'Dirección de Desarrollo Humano y Educación', 'Dirección de Desarrollo Urbano y Ecología', 'DIF Municipal', 'Tesorería Municipal', 'Coordinación de Medio Ambiente y Protección Animal', 'Coordinación de Participación Ciudadana', 'Gobierno del Estado', 'Otra'];
+  const OLD_FUENTE_A_MEDIO = { 'Recorrido': 'Recorrido en colonia', 'Presencial': 'Atención directa en oficina', 'Teléfono': 'Llamada telefónica', 'WhatsApp': 'Redes sociales oficiales', 'Web': 'Redes sociales oficiales' };
 
   function newData() {
     return {
       gestiones: [],
       eventos: [],
       config: {
+        schema: SCHEMA,
         nextId: 1,
         nextEventoId: 1,
         autoLockMin: 5,
         lastBackup: null,
-        catalogos: JSON.parse(JSON.stringify(DEFAULT_CATALOGOS))
+        catalogos: { dependencias: [...DEPENDENCIAS], responsables: [], medios: [...MEDIOS], fuentes: [...FUENTES], tipos: [...TIPOS], municipios: [...MUNICIPIOS] }
       }
     };
   }
@@ -70,7 +98,7 @@
     mapSelected: null,
     cal: (() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; })(),
     selectedDay: null,
-    chartBars: []
+    donuts: {}
   };
   const cartoCache = {};
 
@@ -81,11 +109,7 @@
   const pad = n => String(n).padStart(2, '0');
   const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const today = () => ymd(new Date()); // fecha local (no UTC)
-  const fmtDate = s => {
-    if (!s) return '—';
-    const [y, m, d] = s.split('-');
-    return `${d}/${m}/${y}`;
-  };
+  const fmtDate = s => { if (!s) return '—'; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
   const longDate = s => {
     const [y, m, d] = s.split('-').map(Number);
     const t = new Date(y, m - 1, d).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -93,7 +117,10 @@
   };
   const money = n => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(n) || 0);
   const dash = v => (v === null || v === undefined || v === '') ? '—' : v;
-  const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const isVencida = g => !!g.fechaLimite && g.fechaLimite < today() && !CERRADOS.includes(g.estatus);
+  const CURP_RE = /^[A-Z][AEIOUX][A-Z]{2}\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[HMX][A-Z]{2}[B-DF-HJ-NP-TV-Z]{3}[A-Z\d]\d$/;
 
   function toast(msg, ms = 2600) {
     const t = $('toast');
@@ -134,30 +161,20 @@
   function closeModal(id) { $(id).classList.remove('open'); $(id).setAttribute('aria-hidden', 'true'); }
 
   async function persist() {
-    try {
-      await Vault.save(data);
-    } catch (e) {
-      toast('No se pudo guardar. Revisa el espacio del iPad.', 4000);
-      console.error(e);
-    }
+    try { await Vault.save(data); }
+    catch (e) { toast('No se pudo guardar. Revisa el espacio del iPad.', 4000); console.error(e); }
   }
 
   async function deliverFile(blob, filename) {
     const file = new File([blob], filename, { type: blob.type });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: filename });
-        return true;
-      } catch (e) {
-        if (e.name === 'AbortError') return false;
-      }
+      try { await navigator.share({ files: [file], title: filename }); return true; }
+      catch (e) { if (e.name === 'AbortError') return false; }
     }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 3000);
     return true;
   }
@@ -174,31 +191,45 @@
   // Opciones de catálogo + valores ya usados que no estén en el catálogo
   function catalogOptions(name, field) {
     const base = data.config.catalogos[name] || [];
-    const extra = field ? [...new Set(data.gestiones.map(g => g[field]).filter(Boolean))].filter(v => !base.includes(v)) : [];
+    const baseN = new Set(base.map(norm));
+    const extra = [];
+    if (field) data.gestiones.forEach(g => {
+      const v = (g[field] || '').trim();
+      if (v && !baseN.has(norm(v))) { baseN.add(norm(v)); extra.push(v); }
+    });
     return [...base, ...extra.sort((a, b) => a.localeCompare(b, 'es'))];
   }
-  function fillSelect(sel, options, { all, placeholder, value } = {}) {
+  function fillSelect(sel, options, { all, placeholder, value, extraFirst } = {}) {
     const cur = value !== undefined ? value : sel.value;
     let html = '';
     if (all) html += `<option value="">${esc(all)}</option>`;
+    if (extraFirst) html += extraFirst.map(o => `<option value="${esc(o.id)}">${esc(o.label)}</option>`).join('');
     if (placeholder !== undefined) html += `<option value="">${esc(placeholder)}</option>`;
     const opts = [...options];
-    if (cur && !opts.some(o => (o.id || o) === cur)) opts.push(cur);
-    html += opts.map(o => {
-      const v = o.id || o, l = o.label || o;
-      return `<option value="${esc(v)}">${esc(l)}</option>`;
-    }).join('');
+    const has = v => opts.some(o => (o.id || o) === v) || (extraFirst || []).some(o => o.id === v);
+    if (cur && !has(cur)) opts.push(cur);
+    html += opts.map(o => { const v = o.id || o, l = o.label || o; return `<option value="${esc(v)}">${esc(l)}</option>`; }).join('');
     sel.innerHTML = html;
     sel.value = cur || '';
   }
-  function uniqueColonias() {
+  function uniqueBy(field, normFn = norm) {
     const map = new Map();
     data.gestiones.forEach(g => {
-      if (!g.colonia) return;
-      const k = MapaGeo.normColonia(g.colonia);
-      if (!map.has(k)) map.set(k, g.colonia);
+      const v = (g[field] || '').trim();
+      if (!v) return;
+      const k = normFn(v);
+      if (!map.has(k)) map.set(k, v);
     });
-    return [...map.values()].sort((a, b) => a.localeCompare(b, 'es'));
+    return map; // clave normalizada → etiqueta
+  }
+  const uniqueColonias = () => [...uniqueBy('colonia', MapaGeo.normColonia).values()].sort((a, b) => a.localeCompare(b, 'es'));
+
+  // Responsables: catálogo + los escritos en gestiones (agrupados sin importar mayúsculas/acentos)
+  function responsablesMap() {
+    const map = new Map();
+    (data.config.catalogos.responsables || []).forEach(r => { if (r.trim()) map.set(norm(r), r.trim()); });
+    uniqueBy('responsable').forEach((v, k) => { if (!map.has(k)) map.set(k, v); });
+    return map;
   }
 
   // ================= Preferencias visibles (sin datos sensibles) =================
@@ -224,8 +255,10 @@
     ['setupForm', 'restoreForm', 'unlockForm'].forEach(f => $(f).classList.add('hidden'));
     $(mode).classList.remove('hidden');
     $('lockError').textContent = '';
-    const first = $(mode).querySelector('input');
-    if (first) setTimeout(() => first.focus(), 100);
+    const bio = mode === 'unlockForm' && Vault.bioEnabled();
+    $('bioBtn').classList.toggle('hidden', !bio);
+    $('bioOr').classList.toggle('hidden', !bio);
+    if (!bio) { const first = $(mode).querySelector('input'); if (first) setTimeout(() => first.focus(), 100); }
   }
 
   function enterApp() {
@@ -233,7 +266,8 @@
     $('app').classList.remove('hidden');
     ['setupPass', 'setupPass2', 'unlockPass', 'restorePass'].forEach(id => { $(id).value = ''; });
     lastActivity = Date.now();
-    migrate();
+    const migrated = migrate();
+    if (migrated) persist();
     switchSection('dashboard');
     checkBackupReminder();
   }
@@ -241,16 +275,30 @@
   function lockNow() {
     Vault.lock();
     data = null;
-    // Recargar borra de la memoria todo lo descifrado
-    location.reload();
+    location.reload(); // borra de la memoria todo lo descifrado
   }
 
   function migrate() {
     const def = newData();
     data.gestiones = data.gestiones || [];
     data.eventos = data.eventos || [];
-    data.config = Object.assign(def.config, data.config || {});
-    data.config.catalogos = Object.assign(def.config.catalogos, data.config.catalogos || {});
+    data.config = Object.assign(def.config, data.config || {}, { schema: (data.config && data.config.schema) || 1 });
+    const cat = data.config.catalogos = Object.assign({}, def.config.catalogos, data.config.catalogos || {});
+    if (data.config.schema >= SCHEMA) return false;
+    // Esquema 1 → 2
+    const extraDeps = (cat.dependencias || []).filter(d => !OLD_DEPENDENCIAS.includes(d) && !DEPENDENCIAS.includes(d));
+    cat.dependencias = [...DEPENDENCIAS, ...extraDeps];
+    const oldFuentes = cat.fuentes || [];
+    cat.medios = cat.medios && cat.medios.length ? cat.medios : [...MEDIOS];
+    cat.fuentes = [...FUENTES, ...oldFuentes.filter(f => !(f in OLD_FUENTE_A_MEDIO) && !FUENTES.includes(f))];
+    cat.responsables = cat.responsables || [];
+    data.gestiones.forEach(g => {
+      if (g.estatus === 'revision') g.estatus = 'curso';
+      if (!ESTATUS_LABEL[g.estatus]) g.estatus = 'capturado';
+      if (g.fuente && OLD_FUENTE_A_MEDIO[g.fuente]) { g.medio = OLD_FUENTE_A_MEDIO[g.fuente]; g.fuente = ''; }
+    });
+    data.config.schema = SCHEMA;
+    return true;
   }
 
   async function handleSetup(e) {
@@ -262,7 +310,7 @@
     data = newData();
     await Vault.create(p1, data);
     enterApp();
-    toast('Listo. Tus datos quedan cifrados en este iPad.');
+    toast('Listo. Tus datos quedan cifrados en este iPad. Puedes activar la huella en Configuración.', 4500);
   }
 
   async function handleUnlock(e) {
@@ -289,6 +337,18 @@
     }
   }
 
+  async function handleBioUnlock() {
+    $('lockError').textContent = '';
+    try {
+      data = await Vault.unlockBio();
+      enterApp();
+    } catch (err) {
+      $('lockError').textContent = err.name === 'NotAllowedError'
+        ? 'No se confirmó la huella. Inténtalo otra vez o usa tu contraseña.'
+        : 'No se pudo entrar con la huella. Usa tu contraseña.';
+    }
+  }
+
   async function handleRestore(e) {
     e.preventDefault();
     const file = $('restoreFile').files[0];
@@ -296,9 +356,7 @@
     if (!file) return ($('lockError').textContent = 'Elige el archivo de respaldo.');
     $('lockError').textContent = 'Descifrando respaldo…';
     try {
-      const text = await readFileText(file);
-      const restored = await Vault.readBackup(text, pass);
-      data = restored;
+      data = await Vault.readBackup(await readFileText(file), pass);
       migrate();
       await Vault.create(pass, data);
       enterApp();
@@ -330,6 +388,7 @@
 
   // ================= Navegación =================
   const TITLES = { dashboard: 'Inicio', gestiones: 'Gestiones Ciudadanas', mapa: 'Mapa de Calor', eventos: 'Eventos y Agenda', reportes: 'Reportes', config: 'Configuración' };
+  const RENDER = () => ({ dashboard: renderDashboard, gestiones: renderGestiones, mapa: renderMapa, eventos: renderEventos, reportes: renderReportes, config: renderConfig });
   function switchSection(section) {
     ui.section = section;
     if (section !== 'config') applyPrefs(); // descarta la vista previa de tema no guardada
@@ -339,57 +398,105 @@
     closeSidebar();
     window.scrollTo(0, 0);
     refreshDatalists();
-    ({ dashboard: renderDashboard, gestiones: renderGestiones, mapa: renderMapa, eventos: renderEventos, reportes: renderReportes, config: renderConfig })[section]();
+    RENDER()[section]();
   }
+  function refreshCurrent() { refreshDatalists(); RENDER()[ui.section](); }
   function closeSidebar() { $('sidebar').classList.remove('open'); $('sidebarBackdrop').classList.remove('open'); }
 
   function refreshDatalists() {
-    $('coloniasList').innerHTML = uniqueColonias().map(c => `<option value="${esc(c)}">`).join('');
-    const secs = [...new Set(data.gestiones.map(g => g.seccion).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
-    $('seccionesList').innerHTML = secs.map(s => `<option value="${esc(s)}">`).join('');
+    const opts = arr => arr.map(c => `<option value="${esc(c)}">`).join('');
+    $('coloniasList').innerHTML = opts(uniqueColonias());
+    $('seccionesList').innerHTML = opts([...new Set(data.gestiones.map(g => g.seccion).filter(Boolean))].sort((a, b) => Number(a) - Number(b)));
+    $('responsablesList').innerHTML = opts([...responsablesMap().values()]);
+    $('tiposList').innerHTML = opts(catalogOptions('tipos', 'tipo'));
+    $('municipiosList').innerHTML = opts(catalogOptions('municipios', 'municipio'));
   }
 
   // ================= Inicio =================
-  function renderDashboard() {
-    const counts = Object.fromEntries(ESTATUS.map(e => [e.id, 0]));
-    const montos = Object.fromEntries(ESTATUS.map(e => [e.id, 0]));
-    data.gestiones.forEach(g => { counts[g.estatus] = (counts[g.estatus] || 0) + 1; montos[g.estatus] = (montos[g.estatus] || 0) + (Number(g.monto) || 0); });
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  const estColor = id => cssVar('--st-' + id);
 
-    $('statusCards').innerHTML = ESTATUS.map(e => `
-      <div class="card" style="--c: var(--st-${e.id})" data-estatus="${e.id}">
-        <div class="card-number">${counts[e.id]}</div>
-        <div class="card-title">${e.label}</div>
-        <div class="card-sub">${money(montos[e.id])}</div>
+  function respGroups(list) {
+    const names = responsablesMap();
+    const groups = new Map();
+    list.forEach(g => {
+      const k = norm(g.responsable) || '~';
+      const grp = groups.get(k) || { key: k, label: k === '~' ? 'Sin asignar' : (names.get(k) || g.responsable), total: 0, vencidas: 0, est: {} };
+      grp.total++;
+      if (isVencida(g)) grp.vencidas++;
+      grp.est[g.estatus] = (grp.est[g.estatus] || 0) + 1;
+      groups.set(k, grp);
+    });
+    const arr = [...groups.values()].sort((a, b) => (a.key === '~') - (b.key === '~') || b.total - a.total);
+    let ci = 0;
+    arr.forEach(gp => { gp.color = gp.key === '~' ? GRAY : PALETTE[ci++ % PALETTE.length]; });
+    return arr;
+  }
+
+  function renderDashboard() {
+    const L = data.gestiones;
+    const abiertas = L.filter(g => !CERRADOS.includes(g.estatus)).length;
+    const venc = L.filter(isVencida).length;
+    const curso = L.filter(g => g.estatus === 'curso').length;
+    const det = L.filter(g => g.estatus === 'detenido').length;
+    const cards = [
+      { key: '', label: 'Total de gestiones', n: L.length, sub: plural(abiertas, 'abierta'), c: 'var(--primary)' },
+      { key: 'vencidas', label: 'Tareas vencidas', n: venc, sub: 'Pasaron su fecha límite', c: 'var(--st-vencida)' },
+      { key: 'curso', label: 'En curso', n: curso, sub: plural(L.filter(g => g.estatus === 'curso' && isVencida(g)).length, 'vencida'), c: 'var(--st-curso)' },
+      { key: 'detenido', label: 'Detenido', n: det, sub: plural(L.filter(g => g.estatus === 'detenido' && isVencida(g)).length, 'vencida'), c: 'var(--st-detenido)' }
+    ];
+    $('taskCards').innerHTML = cards.map(c => `
+      <div class="card" style="--c:${c.c}" data-card="${c.key}">
+        <div class="card-number">${c.n}</div><div class="card-title">${c.label}</div><div class="card-sub">${c.sub}</div>
       </div>`).join('');
 
-    drawStatusChart(counts);
+    // Dona por estado
+    const estSlices = ESTATUS.map(e => ({ key: e.id, label: e.label, value: L.filter(g => g.estatus === e.id).length, color: estColor(e.id) }));
+    drawDonut('donutEstado', 'legendEstado', estSlices, 'estado');
+
+    // Dona y barras por responsable
+    const rg = respGroups(L);
+    const top = rg.filter(r => r.key !== '~').slice(0, 9);
+    const rest = rg.filter(r => r.key !== '~').slice(9);
+    const sin = rg.find(r => r.key === '~');
+    const respSlices = top.map(r => ({ key: r.key, label: r.label, value: r.total, color: r.color }));
+    if (rest.length) respSlices.push({ key: '__otros', label: `Otros (${rest.length})`, value: rest.reduce((s, r) => s + r.total, 0), color: '#cbd5e1' });
+    if (sin) respSlices.push({ key: '~', label: 'Sin asignar', value: sin.total, color: GRAY });
+    drawDonut('donutResp', 'legendResp', respSlices, 'responsable');
+
+    $('barLegend').innerHTML = ESTATUS.map(e => `<span><i style="background:${estColor(e.id)}"></i>${e.label}</span>`).join('');
+    const maxT = Math.max(1, ...rg.map(r => r.total));
+    $('respBars').innerHTML = rg.length ? rg.map(r => `
+      <div class="bar-row" data-resp="${esc(r.key)}">
+        <span class="bar-name" title="${esc(r.label)}">${esc(r.label)}</span>
+        <div class="bar-track" style="width:${Math.max(8, (r.total / maxT) * 100)}%">
+          ${ESTATUS.filter(e => r.est[e.id]).map(e => `<div style="width:${(r.est[e.id] / r.total) * 100}%;background:${estColor(e.id)}" title="${e.label}: ${r.est[e.id]}"></div>`).join('')}
+        </div>
+        <span class="bar-total">${r.total}${r.vencidas ? `<small>${r.vencidas} vencida${r.vencidas > 1 ? 's' : ''}</small>` : ''}</span>
+      </div>`).join('') : '<p class="agenda-empty">Aún no hay gestiones.</p>';
 
     // Zonas con más gestiones
     const zonas = new Map();
-    data.gestiones.forEach(g => {
+    L.forEach(g => {
       if (!g.colonia) return;
       const k = MapaGeo.normColonia(g.colonia);
       const z = zonas.get(k) || { key: k, label: g.colonia, count: 0 };
       z.count++;
       zonas.set(k, z);
     });
-    const top = [...zonas.values()].sort((a, b) => b.count - a.count).slice(0, 8);
-    const max = top.length ? top[0].count : 1;
-    $('hotList').innerHTML = top.length ? top.map(z => `
-      <li data-colonia="${esc(z.key)}">
-        <span class="dot"></span>
-        <span class="hot-name">${esc(z.label)}<div class="hot-bar" style="width:${Math.max(6, (z.count / max) * 100)}%"></div></span>
-        <span class="hot-count">${z.count}</span>
-      </li>`).join('') : '<li class="agenda-empty" style="cursor:default">Aún no hay gestiones con colonia.</li>';
+    const zt = [...zonas.values()].sort((a, b) => b.count - a.count).slice(0, 8);
+    const zmax = zt.length ? zt[0].count : 1;
+    $('hotList').innerHTML = zt.length ? zt.map(z => `
+      <li data-colonia="${esc(z.key)}"><span class="dot"></span>
+        <span class="hot-name">${esc(z.label)}<div class="hot-bar" style="width:${Math.max(6, (z.count / zmax) * 100)}%"></div></span>
+        <span class="hot-count">${z.count}</span></li>`).join('') : '<li class="agenda-empty" style="cursor:default">Aún no hay gestiones con colonia.</li>';
 
-    // Próximos eventos
     const hoy = today();
     const proximos = data.eventos.filter(ev => ev.fecha && ev.fecha >= hoy)
       .sort((a, b) => (a.fecha + (a.hora || '')).localeCompare(b.fecha + (b.hora || ''))).slice(0, 5);
     $('dashAgenda').innerHTML = proximos.length ? proximos.map(agendaItem).join('') : '<li class="agenda-empty">No hay eventos próximos.</li>';
 
-    // Sin ubicación
-    const sinUb = data.gestiones.filter(g => !g.colonia && !g.seccion).length;
+    const sinUb = L.filter(g => !g.colonia && !g.seccion).length;
     const n = $('noLocationNotice');
     if (sinUb) {
       n.innerHTML = `<span>📍 ${sinUb} ${sinUb === 1 ? 'gestión no tiene' : 'gestiones no tienen'} colonia ni sección, así que no aparecen en el mapa.</span><button class="btn btn-outline btn-sm" data-action="ver-sin-ubicacion">Ver</button>`;
@@ -397,40 +504,67 @@
     } else n.classList.add('hidden');
   }
 
-  function drawStatusChart(counts) {
-    const canvas = $('statusChart');
+  function drawDonut(canvasId, legendId, slices, kind) {
+    const canvas = $(canvasId);
     const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth || 400, h = canvas.clientHeight || 240;
-    canvas.width = w * dpr; canvas.height = h * dpr;
+    const size = canvas.clientWidth || 210;
+    canvas.width = size * dpr; canvas.height = size * dpr;
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    const css = getComputedStyle(document.documentElement);
-    const textColor = css.getPropertyValue('--text').trim();
-    const muted = css.getPropertyValue('--muted').trim();
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    ui.chartBars = [];
+    ctx.clearRect(0, 0, size, size);
+    const total = slices.reduce((s, x) => s + x.value, 0);
+    const cx = size / 2, cy = size / 2, R = size / 2 - 4, r = R * 0.6;
+    const hits = [];
     if (!total) {
-      ctx.fillStyle = muted; ctx.font = '15px -apple-system, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('Aún no hay gestiones capturadas', w / 2, h / 2);
-      return;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
+      ctx.fillStyle = cssVar('--surface-2'); ctx.fill();
+      ctx.fillStyle = cssVar('--muted'); ctx.font = '14px -apple-system, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Sin datos', cx, cy);
+    } else {
+      let a = -Math.PI / 2;
+      slices.filter(s => s.value).forEach(s => {
+        const da = (s.value / total) * Math.PI * 2;
+        ctx.beginPath(); ctx.arc(cx, cy, R, a, a + da); ctx.arc(cx, cy, r, a + da, a, true); ctx.closePath();
+        ctx.fillStyle = s.color; ctx.fill();
+        ctx.strokeStyle = cssVar('--surface'); ctx.lineWidth = 2; ctx.stroke();
+        hits.push({ key: s.key, a0: a, a1: a + da });
+        a += da;
+      });
+      ctx.fillStyle = cssVar('--text'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '700 30px -apple-system, sans-serif'; ctx.fillText(String(total), cx, cy - 8);
+      ctx.fillStyle = cssVar('--muted'); ctx.font = '13px -apple-system, sans-serif'; ctx.fillText('gestiones', cx, cy + 16);
     }
-    const max = Math.max(...Object.values(counts), 1);
-    const labelW = 110, rowH = h / ESTATUS.length, barH = Math.min(34, rowH * 0.6);
-    ESTATUS.forEach((e, i) => {
-      const y = i * rowH + (rowH - barH) / 2;
-      const bw = Math.max(counts[e.id] ? 4 : 0, ((w - labelW - 70) * counts[e.id]) / max);
-      ctx.fillStyle = textColor; ctx.font = '600 14px -apple-system, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      ctx.fillText(e.label, 0, y + barH / 2);
-      ctx.fillStyle = css.getPropertyValue('--st-' + e.id).trim();
-      ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(labelW, y, bw, barH, 6); else ctx.rect(labelW, y, bw, barH);
-      ctx.fill();
-      ctx.fillStyle = textColor; ctx.font = '700 14px -apple-system, sans-serif';
-      const pct = Math.round((counts[e.id] / total) * 100);
-      ctx.fillText(`${counts[e.id]}  (${pct}%)`, labelW + bw + 8, y + barH / 2);
-      ui.chartBars.push({ estatus: e.id, y0: i * rowH, y1: (i + 1) * rowH });
-    });
+    ui.donuts[canvasId] = { hits, cx, cy, R, r, kind };
+    $(legendId).innerHTML = slices.map(s => `
+      <li data-${kind === 'estado' ? 'est' : 'resp'}="${esc(s.key)}">
+        <span class="sw" style="background:${s.color}"></span><span class="lb">${esc(s.label)}</span>
+        <span class="ct">${s.value}</span><span class="pc">${total ? Math.round((s.value / total) * 100) : 0}%</span></li>`).join('');
+  }
+
+  function donutClick(canvasId, e) {
+    const d = ui.donuts[canvasId];
+    if (!d) return;
+    const rect = $(canvasId).getBoundingClientRect();
+    const x = e.clientX - rect.left - d.cx, y = e.clientY - rect.top - d.cy;
+    const dist = Math.hypot(x, y);
+    if (dist < d.r || dist > d.R) return;
+    let ang = Math.atan2(y, x);
+    if (ang < -Math.PI / 2) ang += Math.PI * 2;
+    const h = d.hits.find(s => ang >= s.a0 && ang < s.a1);
+    if (!h) return;
+    if (d.kind === 'estado') goGestiones({ estatus: h.key });
+    else goGestiones({ responsable: h.key });
+  }
+
+  function goGestiones(f) {
+    setupGestionFilters();
+    $('gFilterEstatus').value = f.estatus || '';
+    $('gFilterResponsable').value = f.responsable && f.responsable !== '__otros' ? f.responsable : '';
+    $('gFilterDependencia').value = '';
+    $('gFilterPrioridad').value = '';
+    $('gFilterSinUbicacion').checked = !!f.sinUbicacion;
+    $('gSearch').value = '';
+    switchSection('gestiones');
   }
 
   function agendaItem(ev) {
@@ -442,25 +576,58 @@
     </li>`;
   }
 
+  // ================= Filtros compartidos =================
+  const ESTADO_FILTER_EXTRA = [{ id: 'vencidas', label: '⚠ Vencidas' }];
+  function applyFilters(list, f) {
+    return list.filter(g => {
+      if (f.estatus === 'vencidas') { if (!isVencida(g)) return false; }
+      else if (f.estatus && g.estatus !== f.estatus) return false;
+      if (f.responsable && (norm(g.responsable) || '~') !== f.responsable) return false;
+      if (f.prioridad && g.prioridad !== f.prioridad) return false;
+      if (f.medio && g.medio !== f.medio) return false;
+      if (f.fuente && g.fuente !== f.fuente) return false;
+      if (f.dependencia && g.dependencia !== f.dependencia) return false;
+      if (f.municipio && norm(g.municipio) !== f.municipio) return false;
+      if (f.colonia && MapaGeo.normColonia(g.colonia) !== f.colonia) return false;
+      if (f.desde && (g.fechaIngreso || '') < f.desde) return false;
+      if (f.hasta && (g.fechaIngreso || '') > f.hasta) return false;
+      return true;
+    });
+  }
+  function respOptions() {
+    const opts = [...responsablesMap()].map(([k, v]) => ({ id: k, label: v })).sort((a, b) => a.label.localeCompare(b.label, 'es'));
+    opts.push({ id: '~', label: 'Sin asignar' });
+    return opts;
+  }
+
   // ================= Gestiones =================
   function setupGestionFilters() {
-    fillSelect($('gFilterEstatus'), ESTATUS, { all: 'Todos los estatus' });
+    fillSelect($('gFilterEstatus'), ESTATUS, { all: 'Todos los estados', extraFirst: ESTADO_FILTER_EXTRA });
+    fillSelect($('gFilterResponsable'), respOptions(), { all: 'Todos los responsables' });
     fillSelect($('gFilterDependencia'), catalogOptions('dependencias', 'dependencia'), { all: 'Todas las dependencias' });
-    fillSelect($('gFilterFuente'), catalogOptions('fuentes', 'fuente'), { all: 'Todas las fuentes' });
+    fillSelect($('gFilterPrioridad'), PRIORIDADES, { all: 'Todas las prioridades' });
+  }
+
+  function prioridadBadge(p) { return p ? `<span class="badge pr-${esc(p)}">${esc(PRIORIDAD_LABEL[p] || p)}</span>` : '—'; }
+  function fechasCell(g) {
+    const lim = g.fechaLimite ? `<br><span class="muted">Límite ${fmtDate(g.fechaLimite)}</span>` : '';
+    return `${fmtDate(g.fechaIngreso)}${lim}`;
+  }
+  function estadoCell(g) {
+    return `<select class="status-select st-${esc(g.estatus)}" data-status-id="${g.id}" aria-label="Estado de la gestión ${g.id}">
+      ${ESTATUS.map(e => `<option value="${e.id}"${e.id === g.estatus ? ' selected' : ''}>${e.label}</option>`).join('')}
+    </select>${isVencida(g) ? '<span class="badge badge-vencida">Vencida</span>' : ''}`;
   }
 
   function renderGestiones() {
     setupGestionFilters();
     const q = norm($('gSearch').value);
-    const fe = $('gFilterEstatus').value, fd = $('gFilterDependencia').value, ff = $('gFilterFuente').value;
+    const f = { estatus: $('gFilterEstatus').value, responsable: $('gFilterResponsable').value, dependencia: $('gFilterDependencia').value, prioridad: $('gFilterPrioridad').value };
     const sinUb = $('gFilterSinUbicacion').checked;
-    const list = data.gestiones.filter(g => {
-      if (fe && g.estatus !== fe) return false;
-      if (fd && g.dependencia !== fd) return false;
-      if (ff && g.fuente !== ff) return false;
+    const list = applyFilters(data.gestiones, f).filter(g => {
       if (sinUb && (g.colonia || g.seccion)) return false;
       if (q) {
-        const hay = norm([g.id, '#' + g.id, g.solicitante, g.telefono, g.colonia, g.seccion, g.municipio, g.dependencia, g.tipo, g.fuente, g.descripcion].join(' '));
+        const hay = norm([g.id, '#' + g.id, g.solicitante, g.curp, g.telefono, g.responsable, g.colonia, g.seccion, g.municipio, g.dependencia, g.tipo, g.medio, g.fuente, g.descripcion, g.observaciones].join(' '));
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -469,24 +636,15 @@
     $('gTableBody').innerHTML = list.length ? list.map(g => `
       <tr data-id="${g.id}">
         <td class="folio">#${g.id}</td>
-        <td>${esc(dash(g.solicitante))}</td>
+        <td>${esc(dash(g.solicitante))}${g.tipo ? `<br><span class="muted">${esc(g.tipo)}</span>` : ''}</td>
+        <td>${esc(dash(g.responsable))}</td>
         <td>${esc(dash(g.dependencia))}</td>
-        <td>${esc(dash(g.fuente))}</td>
+        <td>${prioridadBadge(g.prioridad)}</td>
         <td>${esc(dash(g.colonia))}${g.seccion ? `<br><span class="muted">Secc. ${esc(g.seccion)}</span>` : ''}</td>
-        <td><select class="status-select st-${esc(g.estatus)}" data-status-id="${g.id}" aria-label="Estatus de la gestión ${g.id}">
-          ${ESTATUS.map(e => `<option value="${e.id}"${e.id === g.estatus ? ' selected' : ''}>${e.label}</option>`).join('')}
-        </select></td>
+        <td data-estado-cell>${estadoCell(g)}</td>
         <td class="nowrap">${fechasCell(g)}</td>
-        <td class="num">${g.monto ? money(g.monto) : '—'}</td>
-        <td><div class="row-actions">
-          <button class="btn btn-outline btn-sm" data-delete="${g.id}" aria-label="Eliminar">🗑</button>
-        </div></td>
-      </tr>`).join('') : `<tr><td colspan="9" class="empty">${data.gestiones.length ? 'Ninguna gestión coincide con los filtros.' : 'Aún no hay gestiones. Toca “Nueva gestión” para capturar la primera.'}</td></tr>`;
+      </tr>`).join('') : `<tr><td colspan="8" class="empty">${data.gestiones.length ? 'Ninguna gestión coincide con los filtros.' : 'Aún no hay gestiones. Toca “Nueva gestión” para capturar la primera.'}</td></tr>`;
     $('gCount').textContent = `${list.length} de ${data.gestiones.length} gestiones`;
-  }
-
-  function fechasCell(g) {
-    return `${fmtDate(g.fechaIngreso)}<br><span class="muted">Act. ${fmtDate(g.fechaActualizacion)}</span>`;
   }
 
   async function changeStatus(id, estatus, selectEl) {
@@ -494,41 +652,49 @@
     if (!g) return;
     g.estatus = estatus;
     g.fechaActualizacion = today();
-    if (selectEl) selectEl.className = `status-select st-${estatus}`;
     await persist();
-    const row = selectEl && selectEl.closest('tr');
-    if (row) row.children[6].innerHTML = fechasCell(g);
+    const cell = selectEl && selectEl.closest('[data-estado-cell]');
+    if (cell) cell.innerHTML = estadoCell(g);
     toast(`Folio #${id}: ${ESTATUS_LABEL[estatus]}`);
   }
 
   async function deleteGestion(id) {
     const ok = await confirmBox(`¿Eliminar la gestión #${id}? Esta acción no se puede deshacer.`, 'Eliminar', true);
     if (!ok) return;
+    closeModal('gestionModal');
+    ui.editingGestion = null;
     data.gestiones = data.gestiones.filter(g => g.id !== id);
     data.eventos.forEach(ev => { ev.gestiones = (ev.gestiones || []).filter(x => x !== id); });
     await persist();
-    renderGestiones();
+    refreshCurrent();
     toast(`Gestión #${id} eliminada`);
+  }
+
+  function checkCurp() {
+    const v = $('fCurp').value.toUpperCase().replace(/\s/g, '');
+    $('fCurp').value = v;
+    $('curpHint').textContent = v && !CURP_RE.test(v) ? (v.length < 18 ? `Faltan ${18 - v.length} caracteres.` : 'Revisa la CURP, el formato no parece correcto.') : '';
   }
 
   function openGestionModal(g = null, preset = {}) {
     ui.editingGestion = g;
     const src = g || Object.assign({ estatus: 'capturado', municipio: (data.config.catalogos.municipios || [])[0] || '', fechaIngreso: today() }, preset);
-    fillSelect($('fMunicipio'), catalogOptions('municipios', 'municipio'), { placeholder: 'Sin especificar', value: src.municipio || '' });
+    fillSelect($('fMedio'), catalogOptions('medios', 'medio'), { placeholder: 'Sin especificar', value: src.medio || '' });
+    fillSelect($('fPrioridad'), PRIORIDADES, { placeholder: 'Sin especificar', value: src.prioridad || '' });
     fillSelect($('fDependencia'), catalogOptions('dependencias', 'dependencia'), { placeholder: 'Sin especificar', value: src.dependencia || '' });
-    fillSelect($('fTipo'), catalogOptions('tipos', 'tipo'), { placeholder: 'Sin especificar', value: src.tipo || '' });
     fillSelect($('fFuente'), catalogOptions('fuentes', 'fuente'), { placeholder: 'Sin especificar', value: src.fuente || '' });
     fillSelect($('fEstatus'), ESTATUS, { value: src.estatus || 'capturado' });
-    $('fSolicitante').value = src.solicitante || '';
-    $('fTelefono').value = src.telefono || '';
-    $('fColonia').value = src.colonia || '';
-    $('fSeccion').value = src.seccion || '';
-    $('fMonto').value = src.monto || '';
+    const set = (id, v) => { $(id).value = v || ''; };
+    set('fResponsable', src.responsable); set('fSolicitante', src.solicitante); set('fCurp', src.curp);
+    set('fColonia', src.colonia); set('fSeccion', src.seccion); set('fMunicipio', src.municipio); set('fTelefono', src.telefono);
+    set('fTipo', src.tipo); set('fMonto', src.monto || ''); set('fDescripcion', src.descripcion);
+    set('fPrimerContacto', src.primerContacto); set('fFechaLimite', src.fechaLimite); set('fObservaciones', src.observaciones);
     $('fFechaIngreso').value = src.fechaIngreso || today();
     $('fFechaAct').value = g ? fmtDate(g.fechaActualizacion) : 'Se asigna al guardar';
-    $('fDescripcion').value = src.descripcion || '';
+    checkCurp();
     $('gModalTitle').textContent = g ? `Gestión #${g.id}` : `Nueva gestión · Folio #${data.config.nextId}`;
     $('gScheduleBtn').classList.toggle('hidden', !g);
+    $('gDeleteBtn').classList.toggle('hidden', !g);
 
     const linked = g ? data.eventos.filter(ev => (ev.gestiones || []).includes(g.id)) : [];
     const box = $('gLinkedEvents');
@@ -536,41 +702,35 @@
       box.innerHTML = '<h4>Eventos vinculados</h4>' + linked.map(ev => `<span class="chip" data-evento="${ev.id}">📅 ${esc(fmtDate(ev.fecha))} · ${esc(ev.titulo || 'Evento')}</span>`).join('');
       box.classList.remove('hidden');
     } else box.classList.add('hidden');
-
     openModal('gestionModal');
+    $('gestionModal').scrollTop = 0;
   }
 
   async function saveGestion(e) {
     e.preventDefault();
+    const v = id => $(id).value.trim();
     const montoRaw = $('fMonto').value;
     const form = {
-      solicitante: $('fSolicitante').value.trim(),
-      telefono: $('fTelefono').value.trim(),
-      municipio: $('fMunicipio').value,
-      colonia: $('fColonia').value.trim(),
-      seccion: $('fSeccion').value.trim(),
-      dependencia: $('fDependencia').value,
-      tipo: $('fTipo').value,
-      fuente: $('fFuente').value,
-      monto: montoRaw === '' ? 0 : Math.max(0, parseFloat(montoRaw) || 0),
-      estatus: $('fEstatus').value || 'capturado',
-      fechaIngreso: $('fFechaIngreso').value || today(),
-      descripcion: $('fDescripcion').value.trim()
+      responsable: v('fResponsable'), solicitante: v('fSolicitante'), curp: v('fCurp').toUpperCase(),
+      colonia: v('fColonia'), seccion: v('fSeccion'), municipio: v('fMunicipio'), telefono: v('fTelefono'),
+      medio: $('fMedio').value, fechaIngreso: $('fFechaIngreso').value || today(),
+      tipo: v('fTipo'), monto: montoRaw === '' ? 0 : Math.max(0, parseFloat(montoRaw) || 0), descripcion: v('fDescripcion'),
+      prioridad: $('fPrioridad').value, dependencia: $('fDependencia').value, fuente: $('fFuente').value,
+      primerContacto: $('fPrimerContacto').value, estatus: $('fEstatus').value || 'capturado',
+      fechaLimite: $('fFechaLimite').value, observaciones: v('fObservaciones')
     };
-    const vacia = !form.solicitante && !form.telefono && !form.colonia && !form.seccion && !form.dependencia && !form.tipo && !form.fuente && !form.monto && !form.descripcion;
-    if (vacia && !ui.editingGestion) {
+    // Unifica cómo se escribe el responsable (mismo nombre que en el catálogo)
+    const rn = responsablesMap().get(norm(form.responsable));
+    if (rn) form.responsable = rn;
+    const llenos = ['responsable', 'solicitante', 'curp', 'colonia', 'seccion', 'telefono', 'medio', 'tipo', 'monto', 'descripcion', 'prioridad', 'dependencia', 'fuente', 'primerContacto', 'fechaLimite', 'observaciones'].some(k => form[k]);
+    if (!llenos && !ui.editingGestion) {
       const ok = await confirmBox('No llenaste ningún dato. ¿Guardar la gestión vacía de todos modos?', 'Guardar vacía');
       if (!ok) return;
     }
     form.fechaActualizacion = today();
     let id;
-    if (ui.editingGestion) {
-      Object.assign(ui.editingGestion, form);
-      id = ui.editingGestion.id;
-    } else {
-      id = data.config.nextId++;
-      data.gestiones.push(Object.assign({ id }, form));
-    }
+    if (ui.editingGestion) { Object.assign(ui.editingGestion, form); id = ui.editingGestion.id; }
+    else { id = data.config.nextId++; data.gestiones.push(Object.assign({ id }, form)); }
     await persist();
     closeModal('gestionModal');
     ui.editingGestion = null;
@@ -578,34 +738,13 @@
     toast(`Gestión #${id} guardada`);
   }
 
-  function refreshCurrent() {
-    refreshDatalists();
-    ({ dashboard: renderDashboard, gestiones: renderGestiones, mapa: renderMapa, eventos: renderEventos, reportes: renderReportes, config: renderConfig })[ui.section]();
-  }
-
-  // ================= Filtros compartidos =================
-  function applyFilters(list, f) {
-    return list.filter(g => {
-      if (f.estatus && g.estatus !== f.estatus) return false;
-      if (f.fuente && g.fuente !== f.fuente) return false;
-      if (f.dependencia && g.dependencia !== f.dependencia) return false;
-      if (f.tipo && g.tipo !== f.tipo) return false;
-      if (f.municipio && g.municipio !== f.municipio) return false;
-      if (f.colonia && MapaGeo.normColonia(g.colonia) !== f.colonia) return false;
-      if (f.desde && (g.fechaIngreso || '') < f.desde) return false;
-      if (f.hasta && (g.fechaIngreso || '') > f.hasta) return false;
-      return true;
-    });
-  }
-
   // ================= Mapa =================
   function mapFilters() {
     return {
-      estatus: $('mEstatus').value, fuente: $('mFuente').value, dependencia: $('mDependencia').value,
-      tipo: $('mTipo').value, desde: $('mDesde').value, hasta: $('mHasta').value
+      estatus: $('mEstatus').value, responsable: $('mResponsable').value, dependencia: $('mDependencia').value,
+      medio: $('mMedio').value, fuente: $('mFuente').value, desde: $('mDesde').value, hasta: $('mHasta').value
     };
   }
-
   function mapGroups(view, list) {
     const groups = {};
     list.forEach(g => {
@@ -617,25 +756,22 @@
     });
     return groups;
   }
-
   async function getCarto(view) {
     if (!(view in cartoCache)) cartoCache[view] = await MapaGeo.store.get(view);
     return cartoCache[view];
   }
 
   async function renderMapa() {
-    fillSelect($('mEstatus'), ESTATUS, { all: 'Todos los estatus' });
-    fillSelect($('mFuente'), catalogOptions('fuentes', 'fuente'), { all: 'Todas las fuentes' });
+    fillSelect($('mEstatus'), ESTATUS, { all: 'Todos los estados', extraFirst: ESTADO_FILTER_EXTRA });
+    fillSelect($('mResponsable'), respOptions(), { all: 'Todos los responsables' });
     fillSelect($('mDependencia'), catalogOptions('dependencias', 'dependencia'), { all: 'Todas las dependencias' });
-    fillSelect($('mTipo'), catalogOptions('tipos', 'tipo'), { all: 'Todos los tipos' });
+    fillSelect($('mMedio'), catalogOptions('medios', 'medio'), { all: 'Todos los medios' });
+    fillSelect($('mFuente'), catalogOptions('fuentes', 'fuente'), { all: 'Todas las fuentes' });
     const view = $('mView').value;
-    const list = applyFilters(data.gestiones, mapFilters());
-    const groups = mapGroups(view, list);
+    const groups = mapGroups(view, applyFilters(data.gestiones, mapFilters()));
     const area = $('mapArea');
     const geo = await getCarto(view);
     const onSelect = key => { ui.mapSelected = key; showMapDetail(groups[key], view, key); };
-    const vista = view === 'seccion' ? 'sección' : 'colonia';
-
     if (geo) {
       const r = MapaGeo.renderChoropleth(area, geo, view, groups, { selected: ui.mapSelected, onSelect });
       $('mapLegend').innerHTML = `<span>Menos</span><span class="legend-bar"></span><span>Más gestiones</span>` +
@@ -644,20 +780,18 @@
       const items = Object.values(groups).map(gp => ({ key: gp.key, label: gp.label, count: gp.total })).sort((a, b) => b.count - a.count);
       MapaGeo.renderGrid(area, items, {
         esc, selected: ui.mapSelected, onSelect,
-        message: `Vista de calor por ${vista}. Para ver el mapa con contornos, carga la cartografía de ${view === 'seccion' ? 'secciones' : 'colonias'} en Configuración.`
+        message: `Vista de calor por ${view === 'seccion' ? 'sección' : 'colonia'}. Para ver el mapa con contornos, carga la cartografía de ${view === 'seccion' ? 'secciones' : 'colonias'} en Configuración.`
       });
       $('mapLegend').innerHTML = '<span>Menos</span><span class="legend-bar"></span><span>Más gestiones</span>';
     }
-    if (ui.mapSelected && groups[ui.mapSelected]) showMapDetail(groups[ui.mapSelected], view, ui.mapSelected);
-    else if (ui.mapSelected) showMapDetail(null, view, ui.mapSelected);
+    if (ui.mapSelected) showMapDetail(groups[ui.mapSelected] || null, view, ui.mapSelected);
     else $('mapDetail').innerHTML = '<p class="muted">Toca una zona del mapa para ver sus gestiones.</p>';
   }
 
-  function countBy(items, field, labels) {
+  function countBy(items, getter) {
     const m = {};
-    items.forEach(g => { const k = g[field] || 'Sin especificar'; m[k] = (m[k] || 0) + 1; });
-    return Object.entries(m).sort((a, b) => b[1] - a[1])
-      .map(([k, v]) => `<div class="stat"><span>${esc(labels ? (labels[k] || k) : k)}</span><strong>${v}</strong></div>`).join('');
+    items.forEach(g => { const k = getter(g) || 'Sin especificar'; m[k] = (m[k] || 0) + 1; });
+    return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="stat"><span>${esc(k)}</span><strong>${v}</strong></div>`).join('');
   }
 
   function showMapDetail(grp, view, key) {
@@ -666,16 +800,18 @@
       box.innerHTML = `<h4>${view === 'seccion' ? 'Sección ' + esc(key) : 'Zona seleccionada'}</h4><p class="muted">Sin gestiones con estos filtros.</p>`;
       return;
     }
-    const monto = grp.items.reduce((s, g) => s + (Number(g.monto) || 0), 0);
+    const venc = grp.items.filter(isVencida).length;
     box.innerHTML = `
       <h4>${esc(grp.label)}</h4>
       <div class="stat"><span>Gestiones</span><strong>${grp.total}</strong></div>
-      <div class="stat"><span>Monto estimado</span><strong>${money(monto)}</strong></div>
-      <h5>Por estatus</h5>${countBy(grp.items, 'estatus', ESTATUS_LABEL)}
-      <h5>Por fuente de ingreso</h5>${countBy(grp.items, 'fuente')}
-      <h5>Por dependencia</h5>${countBy(grp.items, 'dependencia')}
+      <div class="stat"><span>Vencidas</span><strong>${venc}</strong></div>
+      <div class="stat"><span>Monto estimado</span><strong>${money(grp.items.reduce((s, g) => s + (Number(g.monto) || 0), 0))}</strong></div>
+      <h5>Por estado</h5>${countBy(grp.items, g => ESTATUS_LABEL[g.estatus])}
+      <h5>Por responsable</h5>${countBy(grp.items, g => g.responsable || 'Sin asignar')}
+      <h5>Por dependencia</h5>${countBy(grp.items, g => g.dependencia)}
+      <h5>Por medio de recepción</h5>${countBy(grp.items, g => g.medio)}
       <h5>Gestiones</h5>
-      <ul class="mini-list">${grp.items.sort((a, b) => b.id - a.id).map(g => `<li data-open-gestion="${g.id}"><strong>#${g.id}</strong> ${esc(dash(g.solicitante))}<br><span class="muted">${esc(ESTATUS_LABEL[g.estatus] || '')}${g.dependencia ? ' · ' + esc(g.dependencia) : ''}</span></li>`).join('')}</ul>
+      <ul class="mini-list">${grp.items.sort((a, b) => b.id - a.id).map(g => `<li data-open-gestion="${g.id}"><strong>#${g.id}</strong> ${esc(dash(g.solicitante))}<br><span class="muted">${esc(ESTATUS_LABEL[g.estatus] || '')}${isVencida(g) ? ' · Vencida' : ''}${g.responsable ? ' · ' + esc(g.responsable) : ''}</span></li>`).join('')}</ul>
       <div class="actions" style="margin-top:12px">
         ${view === 'colonia' ? `<button class="btn btn-outline btn-sm" data-report-colonia="${esc(key)}">Ver reporte</button>
         <button class="btn btn-outline btn-sm" data-event-colonia="${esc(grp.label)}">Agendar evento aquí</button>` : ''}
@@ -749,10 +885,8 @@
 
   function renderLinkList() {
     const q = norm($('eLinkSearch').value);
-    const list = data.gestiones.filter(g => {
-      if (!q) return true;
-      return norm([g.id, '#' + g.id, g.solicitante, g.colonia, g.dependencia, g.tipo].join(' ')).includes(q);
-    }).sort((a, b) => (ui.eventoLinks.has(b.id) - ui.eventoLinks.has(a.id)) || b.id - a.id);
+    const list = data.gestiones.filter(g => !q || norm([g.id, '#' + g.id, g.solicitante, g.responsable, g.colonia, g.dependencia, g.tipo].join(' ')).includes(q))
+      .sort((a, b) => (ui.eventoLinks.has(b.id) - ui.eventoLinks.has(a.id)) || b.id - a.id);
     $('eLinkList').innerHTML = list.length ? list.map(g => `
       <label><input type="checkbox" data-link="${g.id}"${ui.eventoLinks.has(g.id) ? ' checked' : ''}>
       <span><strong>#${g.id}</strong> ${esc(dash(g.solicitante))} <span class="muted">· ${esc(dash(g.colonia))}${g.dependencia ? ' · ' + esc(g.dependencia) : ''}</span></span></label>`).join('')
@@ -762,12 +896,8 @@
   async function saveEvento(e) {
     e.preventDefault();
     const form = {
-      titulo: $('eTitulo').value.trim(),
-      fecha: $('eFecha').value || today(),
-      hora: $('eHora').value,
-      colonia: $('eColonia').value.trim(),
-      lugar: $('eLugar').value.trim(),
-      descripcion: $('eDescripcion').value.trim(),
+      titulo: $('eTitulo').value.trim(), fecha: $('eFecha').value || today(), hora: $('eHora').value,
+      colonia: $('eColonia').value.trim(), lugar: $('eLugar').value.trim(), descripcion: $('eDescripcion').value.trim(),
       gestiones: [...ui.eventoLinks]
     };
     if (ui.editingEvento) Object.assign(ui.editingEvento, form);
@@ -784,8 +914,7 @@
   async function deleteEvento() {
     const ev = ui.editingEvento;
     if (!ev) return;
-    const ok = await confirmBox('¿Eliminar este evento?', 'Eliminar', true);
-    if (!ok) return;
+    if (!(await confirmBox('¿Eliminar este evento?', 'Eliminar', true))) return;
     data.eventos = data.eventos.filter(x => x.id !== ev.id);
     await persist();
     closeModal('eventoModal');
@@ -795,26 +924,28 @@
   }
 
   // ================= Reportes =================
+  const R_IDS = ['rDesde', 'rHasta', 'rEstatus', 'rResponsable', 'rDependencia', 'rPrioridad', 'rMedio', 'rFuente', 'rColonia', 'rMunicipio'];
   function reportFilters() {
     return {
-      desde: $('rDesde').value, hasta: $('rHasta').value, fuente: $('rFuente').value, dependencia: $('rDependencia').value,
-      tipo: $('rTipo').value, colonia: $('rColonia').value, municipio: $('rMunicipio').value, estatus: $('rEstatus').value
+      desde: $('rDesde').value, hasta: $('rHasta').value, estatus: $('rEstatus').value, responsable: $('rResponsable').value,
+      dependencia: $('rDependencia').value, prioridad: $('rPrioridad').value, medio: $('rMedio').value, fuente: $('rFuente').value,
+      colonia: $('rColonia').value, municipio: $('rMunicipio').value
     };
   }
-
   function setupReportFilters() {
-    fillSelect($('rFuente'), catalogOptions('fuentes', 'fuente'), { all: 'Todas' });
+    fillSelect($('rEstatus'), ESTATUS, { all: 'Todos', extraFirst: ESTADO_FILTER_EXTRA });
+    fillSelect($('rResponsable'), respOptions(), { all: 'Todos' });
     fillSelect($('rDependencia'), catalogOptions('dependencias', 'dependencia'), { all: 'Todas' });
-    fillSelect($('rTipo'), catalogOptions('tipos', 'tipo'), { all: 'Todos' });
-    fillSelect($('rMunicipio'), catalogOptions('municipios', 'municipio'), { all: 'Todos' });
-    fillSelect($('rEstatus'), ESTATUS, { all: 'Todos' });
-    const cur = $('rColonia').value;
-    const opts = uniqueColonias().map(c => ({ id: MapaGeo.normColonia(c), label: c }));
-    $('rColonia').innerHTML = '<option value="">Todas</option>' + opts.map(o => `<option value="${esc(o.id)}">${esc(o.label)}</option>`).join('');
-    $('rColonia').value = opts.some(o => o.id === cur) ? cur : '';
+    fillSelect($('rPrioridad'), PRIORIDADES, { all: 'Todas' });
+    fillSelect($('rMedio'), catalogOptions('medios', 'medio'), { all: 'Todos' });
+    fillSelect($('rFuente'), catalogOptions('fuentes', 'fuente'), { all: 'Todas' });
+    const col = [...uniqueBy('colonia', MapaGeo.normColonia)].map(([k, v]) => ({ id: k, label: v })).sort((a, b) => a.label.localeCompare(b.label, 'es'));
+    fillSelect($('rColonia'), col, { all: 'Todas' });
+    const mun = [...uniqueBy('municipio')].map(([k, v]) => ({ id: k, label: v })).sort((a, b) => a.label.localeCompare(b.label, 'es'));
+    fillSelect($('rMunicipio'), mun, { all: 'Todos' });
   }
 
-  const GROUP_LABEL = { colonia: 'Colonia', seccion: 'Sección', fuente: 'Fuente de ingreso', dependencia: 'Dependencia', tipo: 'Tipo de gestión', estatus: 'Estatus', municipio: 'Municipio' };
+  const GROUP_LABEL = { estatus: 'Estado', responsable: 'Responsable', dependencia: 'Dependencia', prioridad: 'Prioridad', colonia: 'Colonia', seccion: 'Sección', medio: 'Medio de recepción', fuente: 'Fuente de ingreso', tipo: 'Tipo de apoyo', municipio: 'Municipio' };
 
   function reportData() {
     const list = applyFilters(data.gestiones, reportFilters()).sort((a, b) => a.id - b.id);
@@ -824,47 +955,37 @@
       let k, label;
       if (by === 'colonia') { k = MapaGeo.normColonia(g.colonia); label = g.colonia; }
       else if (by === 'estatus') { k = g.estatus; label = ESTATUS_LABEL[g.estatus]; }
-      else { k = g[by] || ''; label = g[by]; }
-      if (!k) { k = '~'; label = 'Sin especificar'; }
-      const grp = groups.get(k) || { label, total: 0, monto: 0, est: Object.fromEntries(ESTATUS.map(e => [e.id, 0])) };
+      else if (by === 'prioridad') { k = g.prioridad; label = PRIORIDAD_LABEL[g.prioridad]; }
+      else { k = norm(g[by]); label = (g[by] || '').trim(); }
+      if (!k) { k = '~'; label = by === 'responsable' ? 'Sin asignar' : 'Sin especificar'; }
+      const grp = groups.get(k) || { label, total: 0, vencidas: 0, monto: 0, est: Object.fromEntries(ESTATUS.map(e => [e.id, 0])) };
       grp.total++;
+      if (isVencida(g)) grp.vencidas++;
       grp.monto += Number(g.monto) || 0;
       grp.est[g.estatus] = (grp.est[g.estatus] || 0) + 1;
       groups.set(k, grp);
     });
-    const rows = [...groups.values()].sort((a, b) => b.total - a.total);
-    return { list, by, rows };
+    return { list, by, rows: [...groups.values()].sort((a, b) => b.total - a.total) };
   }
 
   function filtersDescription() {
     const f = reportFilters();
+    const lbl = id => $(id).selectedOptions[0] ? $(id).selectedOptions[0].textContent.replace('⚠ ', '') : '';
     const parts = [];
     if (f.desde || f.hasta) parts.push(`Periodo: ${f.desde ? fmtDate(f.desde) : 'inicio'} a ${f.hasta ? fmtDate(f.hasta) : 'hoy'}`);
-    if (f.fuente) parts.push('Fuente: ' + f.fuente);
-    if (f.dependencia) parts.push('Dependencia: ' + f.dependencia);
-    if (f.tipo) parts.push('Tipo: ' + f.tipo);
-    if (f.colonia) parts.push('Colonia: ' + $('rColonia').selectedOptions[0].textContent);
-    if (f.municipio) parts.push('Municipio: ' + f.municipio);
-    if (f.estatus) parts.push('Estatus: ' + ESTATUS_LABEL[f.estatus]);
+    [['estatus', 'Estado', 'rEstatus'], ['responsable', 'Responsable', 'rResponsable'], ['dependencia', 'Dependencia', 'rDependencia'], ['prioridad', 'Prioridad', 'rPrioridad'],
+      ['medio', 'Medio', 'rMedio'], ['fuente', 'Fuente', 'rFuente'], ['colonia', 'Colonia', 'rColonia'], ['municipio', 'Municipio', 'rMunicipio']]
+      .forEach(([k, t, id]) => { if (f[k]) parts.push(`${t}: ${lbl(id)}`); });
     return parts.length ? parts.join(' · ') : 'Sin filtros (todas las gestiones)';
   }
 
   function summaryTableHtml(rows, by, total) {
-    const tot = rows.reduce((a, r) => { a.total += r.total; a.monto += r.monto; ESTATUS.forEach(e => { a.est[e.id] += r.est[e.id]; }); return a; },
-      { total: 0, monto: 0, est: Object.fromEntries(ESTATUS.map(e => [e.id, 0])) });
-    return `<thead><tr><th>${GROUP_LABEL[by]}</th><th class="num">Gestiones</th><th class="num">%</th>${ESTATUS.map(e => `<th class="num">${e.label}</th>`).join('')}<th class="num">Monto</th></tr></thead>
-      <tbody>${rows.length ? rows.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.total}</td><td class="num">${total ? Math.round((r.total / total) * 100) : 0}%</td>${ESTATUS.map(e => `<td class="num">${r.est[e.id]}</td>`).join('')}<td class="num">${money(r.monto)}</td></tr>`).join('')
-        : `<tr><td colspan="${4 + ESTATUS.length}" class="empty">Sin resultados.</td></tr>`}
-      ${rows.length ? `<tr class="total-row"><td>Total</td><td class="num">${tot.total}</td><td class="num">100%</td>${ESTATUS.map(e => `<td class="num">${tot.est[e.id]}</td>`).join('')}<td class="num">${money(tot.monto)}</td></tr>` : ''}</tbody>`;
-  }
-
-  function detailRowsHtml(list) {
-    return list.length ? list.map(g => `<tr data-open-gestion="${g.id}" style="cursor:pointer">
-      <td class="folio">#${g.id}</td><td>${esc(dash(g.solicitante))}</td><td>${esc(dash(g.dependencia))}</td><td>${esc(dash(g.tipo))}</td>
-      <td>${esc(dash(g.fuente))}</td><td>${esc(dash(g.colonia))}</td><td>${esc(dash(g.seccion))}</td>
-      <td><span class="badge st-${esc(g.estatus)}">${esc(ESTATUS_LABEL[g.estatus] || g.estatus)}</span></td>
-      <td class="nowrap">${fmtDate(g.fechaIngreso)}</td><td class="num">${g.monto ? money(g.monto) : '—'}</td></tr>`).join('')
-      : '<tr><td colspan="10" class="empty">Sin resultados con estos filtros.</td></tr>';
+    const tot = rows.reduce((a, r) => { a.total += r.total; a.vencidas += r.vencidas; a.monto += r.monto; ESTATUS.forEach(e => { a.est[e.id] += r.est[e.id]; }); return a; },
+      { total: 0, vencidas: 0, monto: 0, est: Object.fromEntries(ESTATUS.map(e => [e.id, 0])) });
+    const cells = r => `<td class="num">${r.total}</td><td class="num">${total ? Math.round((r.total / total) * 100) : 0}%</td>${ESTATUS.map(e => `<td class="num">${r.est[e.id]}</td>`).join('')}<td class="num">${r.vencidas}</td><td class="num">${money(r.monto)}</td>`;
+    return `<thead><tr><th>${GROUP_LABEL[by]}</th><th class="num">Total</th><th class="num">%</th>${ESTATUS.map(e => `<th class="num">${e.label}</th>`).join('')}<th class="num">Vencidas</th><th class="num">Monto</th></tr></thead>
+      <tbody>${rows.length ? rows.map(r => `<tr><td>${esc(r.label)}</td>${cells(r)}</tr>`).join('') : `<tr><td colspan="${5 + ESTATUS.length}" class="empty">Sin resultados.</td></tr>`}
+      ${rows.length ? `<tr class="total-row"><td>Total</td>${cells(tot)}</tr>` : ''}</tbody>`;
   }
 
   function renderReportes() {
@@ -874,7 +995,12 @@
     $('rSummaryTitle').textContent = `Resumen por ${GROUP_LABEL[by].toLowerCase()}`;
     $('rSummary').innerHTML = summaryTableHtml(rows, by, list.length);
     $('rDetailTitle').textContent = `Detalle: ${list.length} ${list.length === 1 ? 'gestión' : 'gestiones'} · ${money(monto)}`;
-    $('rTableBody').innerHTML = detailRowsHtml(list);
+    $('rTableBody').innerHTML = list.length ? list.map(g => `<tr data-open-gestion="${g.id}" style="cursor:pointer">
+      <td class="folio">#${g.id}</td><td>${esc(dash(g.solicitante))}</td><td>${esc(dash(g.responsable))}</td><td>${esc(dash(g.dependencia))}</td>
+      <td>${prioridadBadge(g.prioridad)}</td><td>${esc(dash(g.colonia))}</td>
+      <td><span class="badge st-${esc(g.estatus)}">${esc(ESTATUS_LABEL[g.estatus] || g.estatus)}</span>${isVencida(g) ? '<span class="badge badge-vencida">Vencida</span>' : ''}</td>
+      <td class="nowrap">${fmtDate(g.fechaIngreso)}</td><td class="nowrap">${fmtDate(g.fechaLimite)}</td><td class="num">${g.monto ? money(g.monto) : '—'}</td></tr>`).join('')
+      : '<tr><td colspan="10" class="empty">Sin resultados con estos filtros.</td></tr>';
   }
 
   async function exportExcel() {
@@ -884,24 +1010,27 @@
       {
         name: 'Gestiones',
         columns: [
-          { header: 'Folio', width: 8, type: 'number' }, { header: 'Solicitante', width: 28 }, { header: 'Teléfono', width: 14 },
-          { header: 'Municipio', width: 16 }, { header: 'Colonia', width: 22 }, { header: 'Sección', width: 10 },
-          { header: 'Dependencia', width: 34 }, { header: 'Tipo de gestión', width: 18 }, { header: 'Fuente de ingreso', width: 16 },
-          { header: 'Estatus', width: 13 }, { header: 'Monto estimado', width: 15, type: 'money' }, { header: 'Fecha de ingreso', width: 15 },
-          { header: 'Última actualización', width: 18 }, { header: 'Descripción', width: 50 }
+          { header: 'Folio', width: 8, type: 'number' }, { header: 'Responsable', width: 22 }, { header: 'Nombre completo', width: 28 },
+          { header: 'CURP', width: 21 }, { header: 'Teléfono', width: 14 }, { header: 'Colonia domicilio', width: 22 }, { header: 'Sección', width: 9 },
+          { header: 'Municipio', width: 15 }, { header: 'Medio de recepción', width: 24 }, { header: 'Fecha de ingreso', width: 15 },
+          { header: 'Tipo de apoyo o petición', width: 24 }, { header: 'Detalle del problema', width: 50 }, { header: 'Monto estimado', width: 15, type: 'money' },
+          { header: 'Prioridad', width: 10 }, { header: 'Dependencia responsable', width: 40 }, { header: 'Fuente de ingreso', width: 24 },
+          { header: 'Primer contacto', width: 15 }, { header: 'Estado actual', width: 13 }, { header: 'Vencida', width: 9 }, { header: 'Fecha límite', width: 13 },
+          { header: 'Última actualización', width: 18 }, { header: 'Observaciones', width: 50 }
         ],
-        rows: list.map(g => [g.id, g.solicitante, g.telefono, g.municipio, g.colonia, g.seccion, g.dependencia, g.tipo, g.fuente,
-          ESTATUS_LABEL[g.estatus] || g.estatus, Number(g.monto) || 0, fmtDate(g.fechaIngreso), fmtDate(g.fechaActualizacion), g.descripcion])
+        rows: list.map(g => [g.id, g.responsable, g.solicitante, g.curp, g.telefono, g.colonia, g.seccion, g.municipio, g.medio, fmtDate(g.fechaIngreso),
+          g.tipo, g.descripcion, Number(g.monto) || 0, PRIORIDAD_LABEL[g.prioridad] || '', g.dependencia, g.fuente,
+          g.primerContacto ? fmtDate(g.primerContacto) : '', ESTATUS_LABEL[g.estatus] || g.estatus, isVencida(g) ? 'Sí' : 'No',
+          g.fechaLimite ? fmtDate(g.fechaLimite) : '', fmtDate(g.fechaActualizacion), g.observaciones])
       },
       {
         name: 'Resumen por ' + GROUP_LABEL[by].toLowerCase(),
-        columns: [{ header: GROUP_LABEL[by], width: 34 }, { header: 'Gestiones', width: 11, type: 'number' },
-          ...ESTATUS.map(e => ({ header: e.label, width: 12, type: 'number' })), { header: 'Monto estimado', width: 16, type: 'money' }],
-        rows: rows.map(r => [r.label, r.total, ...ESTATUS.map(e => r.est[e.id]), r.monto])
+        columns: [{ header: GROUP_LABEL[by], width: 36 }, { header: 'Total', width: 9, type: 'number' },
+          ...ESTATUS.map(e => ({ header: e.label, width: 12, type: 'number' })), { header: 'Vencidas', width: 10, type: 'number' }, { header: 'Monto estimado', width: 16, type: 'money' }],
+        rows: rows.map(r => [r.label, r.total, ...ESTATUS.map(e => r.est[e.id]), r.vencidas, r.monto])
       }
     ];
-    const blob = XLSX.build(sheets);
-    await deliverFile(blob, `reporte-gestiones-${today()}.xlsx`);
+    await deliverFile(XLSX.build(sheets), `reporte-gestiones-${today()}.xlsx`);
   }
 
   function exportPdf() {
@@ -911,12 +1040,12 @@
     const monto = list.reduce((s, g) => s + (Number(g.monto) || 0), 0);
     $('printArea').innerHTML = `
       <h1>${esc(name)} · Reporte de gestiones</h1>
-      <div class="p-meta">Generado el ${esc(longDate(today()))} · ${esc(filtersDescription())}<br>${list.length} gestiones · Monto estimado total ${money(monto)}</div>
+      <div class="p-meta">Generado el ${esc(longDate(today()))} · ${esc(filtersDescription())}<br>${list.length} gestiones · ${list.filter(isVencida).length} vencidas · Monto estimado total ${money(monto)}</div>
       <h2>Resumen por ${esc(GROUP_LABEL[by].toLowerCase())}</h2>
       <table>${summaryTableHtml(rows, by, list.length)}</table>
       <h2>Detalle</h2>
-      <table><thead><tr><th>Folio</th><th>Solicitante</th><th>Dependencia</th><th>Tipo</th><th>Fuente</th><th>Colonia</th><th>Sección</th><th>Estatus</th><th>Ingreso</th><th class="num">Monto</th></tr></thead>
-      <tbody>${list.map(g => `<tr><td>#${g.id}</td><td>${esc(dash(g.solicitante))}</td><td>${esc(dash(g.dependencia))}</td><td>${esc(dash(g.tipo))}</td><td>${esc(dash(g.fuente))}</td><td>${esc(dash(g.colonia))}</td><td>${esc(dash(g.seccion))}</td><td>${esc(ESTATUS_LABEL[g.estatus] || '')}</td><td>${fmtDate(g.fechaIngreso)}</td><td class="num">${g.monto ? money(g.monto) : '—'}</td></tr>`).join('')}</tbody></table>`;
+      <table><thead><tr><th>Folio</th><th>Solicitante</th><th>Responsable</th><th>Dependencia</th><th>Prioridad</th><th>Colonia</th><th>Estado</th><th>Ingreso</th><th>Límite</th><th class="num">Monto</th></tr></thead>
+      <tbody>${list.map(g => `<tr><td>#${g.id}</td><td>${esc(dash(g.solicitante))}</td><td>${esc(dash(g.responsable))}</td><td>${esc(dash(g.dependencia))}</td><td>${esc(PRIORIDAD_LABEL[g.prioridad] || '—')}</td><td>${esc(dash(g.colonia))}</td><td>${esc(ESTATUS_LABEL[g.estatus] || '')}${isVencida(g) ? ' (vencida)' : ''}</td><td>${fmtDate(g.fechaIngreso)}</td><td>${fmtDate(g.fechaLimite)}</td><td class="num">${g.monto ? money(g.monto) : '—'}</td></tr>`).join('')}</tbody></table>`;
     toast('En la vista de impresión, toca el botón Compartir para guardar como PDF.', 5000);
     setTimeout(() => window.print(), 300);
   }
@@ -929,15 +1058,50 @@
     $('cfgLock').value = String(data.config.autoLockMin || 5);
     $('cfgLastBackup').textContent = data.config.lastBackup ? `Último respaldo: ${longDate(data.config.lastBackup.slice(0, 10))}` : 'Aún no has hecho ningún respaldo.';
     const c = data.config.catalogos;
-    $('catDependencias').value = (c.dependencias || []).join('\n');
-    $('catTipos').value = (c.tipos || []).join('\n');
-    $('catFuentes').value = (c.fuentes || []).join('\n');
-    $('catMunicipios').value = (c.municipios || []).join('\n');
+    [['catDependencias', 'dependencias'], ['catResponsables', 'responsables'], ['catMedios', 'medios'], ['catFuentes', 'fuentes'], ['catTipos', 'tipos'], ['catMunicipios', 'municipios']]
+      .forEach(([id, k]) => { $(id).value = (c[k] || []).join('\n'); });
+    renderBioStatus();
     const [sec, col] = await Promise.all([getCarto('seccion'), getCarto('colonia')]);
-    const st = [];
-    st.push(sec ? `Secciones: ${sec.features.length} zonas cargadas.` : 'Secciones: sin cargar.');
-    st.push(col ? `Colonias: ${col.features.length} zonas cargadas.` : 'Colonias: sin cargar.');
-    $('cfgCartoStatus').textContent = st.join(' ');
+    $('cfgCartoStatus').textContent = `${sec ? `Secciones: ${sec.features.length} zonas cargadas.` : 'Secciones: sin cargar.'} ${col ? `Colonias: ${col.features.length} zonas cargadas.` : 'Colonias: sin cargar.'}`;
+  }
+
+  async function renderBioStatus() {
+    const enabled = Vault.bioEnabled();
+    const avail = await Vault.bioAvailable();
+    $('cfgBioConfirm').classList.add('hidden');
+    $('cfgBioEnable').classList.toggle('hidden', enabled || !avail);
+    $('cfgBioDisable').classList.toggle('hidden', !enabled);
+    $('cfgBioStatus').textContent = enabled
+      ? 'Activada. En la pantalla de bloqueo toca “Entrar con huella / Face ID”. Tu contraseña sigue funcionando.'
+      : avail ? 'Entra con tu huella o Face ID en lugar de escribir la contraseña. Tus datos siguen cifrados igual.'
+        : 'Este dispositivo o navegador no ofrece huella / Face ID para esta app.';
+  }
+
+  async function enableBio() {
+    try {
+      const r = await Vault.enableBio();
+      if (r === 'confirmar') {
+        $('cfgBioEnable').classList.add('hidden');
+        $('cfgBioConfirm').classList.remove('hidden');
+        $('cfgBioStatus').textContent = 'Falta un paso: toca “Confirmar con tu huella”.';
+        return;
+      }
+      toast('Huella activada');
+      renderBioStatus();
+    } catch (err) {
+      bioError(err);
+    }
+  }
+  async function confirmBio() {
+    try { await Vault.confirmBio(); toast('Huella activada'); }
+    catch (err) { bioError(err); }
+    renderBioStatus();
+  }
+  function bioError(err) {
+    if (err && err.name === 'NotAllowedError') return toast('Se canceló. Puedes intentarlo de nuevo.');
+    if (err && err.message === 'prf') return toast('Tu iPad no permite usar la huella para descifrar en esta app. Actualiza iPadOS a la versión más reciente.', 6000);
+    toast('No se pudo activar la huella.', 4000);
+    console.error(err);
   }
 
   async function saveGeneral() {
@@ -956,7 +1120,7 @@
     if (n1.length < 8) return toast('La nueva contraseña debe tener al menos 8 caracteres.');
     if (n1 !== n2) return toast('Las contraseñas nuevas no coinciden.');
     if (!(await Vault.verify(old))) return toast('La contraseña actual no es correcta.');
-    await Vault.changePassword(n1, data);
+    await Vault.changePassword(n1);
     ['cfgOldPass', 'cfgNewPass', 'cfgNewPass2'].forEach(id => { $(id).value = ''; });
     toast('Contraseña cambiada. Haz un respaldo nuevo: los anteriores siguen con la contraseña vieja.', 5000);
   }
@@ -964,15 +1128,15 @@
   async function saveCatalogs() {
     const parse = id => [...new Set($(id).value.split('\n').map(s => s.trim()).filter(Boolean))];
     data.config.catalogos = {
-      dependencias: parse('catDependencias'), tipos: parse('catTipos'), fuentes: parse('catFuentes'), municipios: parse('catMunicipios')
+      dependencias: parse('catDependencias'), responsables: parse('catResponsables'), medios: parse('catMedios'),
+      fuentes: parse('catFuentes'), tipos: parse('catTipos'), municipios: parse('catMunicipios')
     };
     await persist();
     toast('Catálogos guardados');
   }
 
   async function exportBackup() {
-    const blob = new Blob([Vault.backupText()], { type: 'application/json' });
-    const ok = await deliverFile(blob, `respaldo-${today()}.json`);
+    const ok = await deliverFile(new Blob([Vault.backupText()], { type: 'application/json' }), `respaldo-${today()}.json`);
     if (ok) {
       data.config.lastBackup = new Date().toISOString();
       await persist();
@@ -987,14 +1151,12 @@
     const pass = await passwordBox('Escribe la contraseña con la que se hizo ese respaldo:');
     if (pass === null) return;
     try {
-      const text = await readFileText(file);
-      const restored = await Vault.readBackup(text, pass);
+      const restored = await Vault.readBackup(await readFileText(file), pass);
       const n = (restored.gestiones || []).length;
-      const ok = await confirmBox(`El respaldo tiene ${n} gestiones. ¿Reemplazar TODOS los datos actuales con él?`, 'Reemplazar', true);
-      if (!ok) return;
+      if (!(await confirmBox(`El respaldo tiene ${n} gestiones. ¿Reemplazar TODOS los datos actuales con él?`, 'Reemplazar', true))) return;
       data = restored;
       migrate();
-      await persist(); // se vuelve a cifrar con tu contraseña actual
+      await persist(); // se vuelve a cifrar con tu llave actual
       toast('Respaldo restaurado.');
       switchSection('dashboard');
     } catch (err) {
@@ -1035,6 +1197,7 @@
     $('setupForm').addEventListener('submit', handleSetup);
     $('unlockForm').addEventListener('submit', handleUnlock);
     $('restoreForm').addEventListener('submit', handleRestore);
+    $('bioBtn').addEventListener('click', handleBioUnlock);
     $('showRestoreBtn').addEventListener('click', () => showLock('restoreForm'));
     $('hideRestoreBtn').addEventListener('click', () => showLock('setupForm'));
     $('lockBtn').addEventListener('click', lockNow);
@@ -1043,21 +1206,18 @@
     $('sidebarMenu').addEventListener('click', e => { const li = e.target.closest('li'); if (li) switchSection(li.dataset.section); });
 
     // Inicio
-    $('statusCards').addEventListener('click', e => {
-      const c = e.target.closest('.card');
-      if (!c) return;
-      setupGestionFilters();
-      $('gFilterEstatus').value = c.dataset.estatus;
-      switchSection('gestiones');
+    $('taskCards').addEventListener('click', e => {
+      const c = e.target.closest('[data-card]');
+      if (c) goGestiones({ estatus: c.dataset.card });
     });
-    $('statusChart').addEventListener('click', e => {
-      const r = $('statusChart').getBoundingClientRect();
-      const y = e.clientY - r.top;
-      const bar = ui.chartBars.find(b => y >= b.y0 && y < b.y1);
-      if (bar) { setupGestionFilters(); $('gFilterEstatus').value = bar.estatus; switchSection('gestiones'); }
-    });
+    $('donutEstado').addEventListener('click', e => donutClick('donutEstado', e));
+    $('donutResp').addEventListener('click', e => donutClick('donutResp', e));
+    $('legendEstado').addEventListener('click', e => { const li = e.target.closest('[data-est]'); if (li) goGestiones({ estatus: li.dataset.est }); });
+    $('legendResp').addEventListener('click', e => { const li = e.target.closest('[data-resp]'); if (li) goGestiones({ responsable: li.dataset.resp }); });
+    $('respBars').addEventListener('click', e => { const r = e.target.closest('[data-resp]'); if (r) goGestiones({ responsable: r.dataset.resp }); });
     $('hotList').addEventListener('click', e => { const li = e.target.closest('li[data-colonia]'); if (li) goToMapColonia(li.dataset.colonia); });
-    window.addEventListener('resize', () => { if (data && ui.section === 'dashboard') renderDashboard(); });
+    let rz;
+    window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (data && ui.section === 'dashboard') renderDashboard(); }, 200); });
 
     // Acciones generales (delegadas)
     document.addEventListener('click', e => {
@@ -1067,7 +1227,7 @@
         if (act === 'new-gestion') openGestionModal();
         else if (act === 'new-evento') openEventoModal();
         else if (act === 'go-backup') { switchSection('config'); $('backupPanel').scrollIntoView({ behavior: 'smooth' }); }
-        else if (act === 'ver-sin-ubicacion') { $('gFilterSinUbicacion').checked = true; switchSection('gestiones'); }
+        else if (act === 'ver-sin-ubicacion') goGestiones({ sinUbicacion: true });
         else if (act === 'agenda-proximos') { ui.selectedDay = null; renderEventos(); }
         return;
       }
@@ -1080,7 +1240,7 @@
         return;
       }
       const rc = e.target.closest('[data-report-colonia]');
-      if (rc) { switchSection('reportes'); $('rColonia').value = rc.dataset.reportColonia; $('rGroup').value = 'fuente'; renderReportes(); return; }
+      if (rc) { switchSection('reportes'); R_IDS.forEach(id => { $(id).value = ''; }); $('rColonia').value = rc.dataset.reportColonia; $('rGroup').value = 'estatus'; renderReportes(); return; }
       const ec = e.target.closest('[data-event-colonia]');
       if (ec) {
         const key = MapaGeo.normColonia(ec.dataset.eventColonia);
@@ -1089,26 +1249,24 @@
         return;
       }
       const nd = e.target.closest('[data-new-evento-day]');
-      if (nd) { openEventoModal(null, { fecha: nd.dataset.newEventoDay }); }
+      if (nd) openEventoModal(null, { fecha: nd.dataset.newEventoDay });
     });
 
     // Gestiones
-    ['gSearch'].forEach(id => $(id).addEventListener('input', renderGestiones));
-    ['gFilterEstatus', 'gFilterDependencia', 'gFilterFuente', 'gFilterSinUbicacion'].forEach(id => $(id).addEventListener('change', renderGestiones));
+    $('gSearch').addEventListener('input', renderGestiones);
+    ['gFilterEstatus', 'gFilterResponsable', 'gFilterDependencia', 'gFilterPrioridad', 'gFilterSinUbicacion'].forEach(id => $(id).addEventListener('change', renderGestiones));
     $('gTableBody').addEventListener('change', e => {
       const s = e.target.closest('[data-status-id]');
       if (s) changeStatus(Number(s.dataset.statusId), s.value, s);
     });
     $('gTableBody').addEventListener('click', e => {
-      const ed = e.target.closest('[data-edit]');
-      if (ed) { openGestionModal(data.gestiones.find(g => g.id === Number(ed.dataset.edit))); return; }
-      const del = e.target.closest('[data-delete]');
-      if (del) { deleteGestion(Number(del.dataset.delete)); return; }
       if (e.target.closest('select, button')) return;
       const tr = e.target.closest('tr[data-id]');
       if (tr) openGestionModal(data.gestiones.find(g => g.id === Number(tr.dataset.id)));
     });
     $('gestionForm').addEventListener('submit', saveGestion);
+    $('fCurp').addEventListener('input', checkCurp);
+    $('gDeleteBtn').addEventListener('click', () => { if (ui.editingGestion) deleteGestion(ui.editingGestion.id); });
     $('gScheduleBtn').addEventListener('click', () => {
       const g = ui.editingGestion;
       closeModal('gestionModal');
@@ -1116,7 +1274,7 @@
     });
 
     // Mapa
-    ['mView', 'mEstatus', 'mFuente', 'mDependencia', 'mTipo', 'mDesde', 'mHasta'].forEach(id => $(id).addEventListener('change', () => {
+    ['mView', 'mEstatus', 'mResponsable', 'mDependencia', 'mMedio', 'mFuente', 'mDesde', 'mHasta'].forEach(id => $(id).addEventListener('change', () => {
       if (id === 'mView') ui.mapSelected = null;
       renderMapa();
     }));
@@ -1152,11 +1310,8 @@
     });
 
     // Reportes
-    ['rDesde', 'rHasta', 'rFuente', 'rDependencia', 'rTipo', 'rColonia', 'rMunicipio', 'rEstatus', 'rGroup'].forEach(id => $(id).addEventListener('change', renderReportes));
-    $('rClear').addEventListener('click', () => {
-      ['rDesde', 'rHasta', 'rFuente', 'rDependencia', 'rTipo', 'rColonia', 'rMunicipio', 'rEstatus'].forEach(id => { $(id).value = ''; });
-      renderReportes();
-    });
+    [...R_IDS, 'rGroup'].forEach(id => $(id).addEventListener('change', renderReportes));
+    $('rClear').addEventListener('click', () => { R_IDS.forEach(id => { $(id).value = ''; }); renderReportes(); });
     $('rExcel').addEventListener('click', exportExcel);
     $('rPdf').addEventListener('click', exportPdf);
 
@@ -1170,6 +1325,14 @@
     $('cfgSaveGeneral').addEventListener('click', saveGeneral);
     $('cfgChangePass').addEventListener('click', changePassword);
     $('cfgSaveCatalogs').addEventListener('click', saveCatalogs);
+    $('cfgBioEnable').addEventListener('click', enableBio);
+    $('cfgBioConfirm').addEventListener('click', confirmBio);
+    $('cfgBioDisable').addEventListener('click', async () => {
+      if (!(await confirmBox('¿Desactivar la entrada con huella? Seguirás entrando con tu contraseña.', 'Desactivar'))) return;
+      Vault.disableBio();
+      renderBioStatus();
+      toast('Huella desactivada');
+    });
     $('cfgExport').addEventListener('click', exportBackup);
     $('cfgImport').addEventListener('change', e => { importBackup(e.target.files[0]); e.target.value = ''; });
     $('cfgCartoSeccion').addEventListener('change', e => { importCarto('seccion', e.target.files[0]); e.target.value = ''; });
@@ -1203,7 +1366,6 @@
     }
     setupAutoLock();
     showLock(Vault.exists() ? 'unlockForm' : 'setupForm');
-
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
       navigator.serviceWorker.register('sw.js').catch(() => {});
     }

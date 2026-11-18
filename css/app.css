@@ -14,9 +14,11 @@
   --muted: #6b7280;
   --border: #d9dee5;
   --st-capturado: #2563eb;
-  --st-revision: #d97706;
+  --st-curso: #0e7490;
+  --st-detenido: #7c3aed;
   --st-terminado: #15803d;
   --st-cancelado: #b91c1c;
+  --st-vencida: #dc2626;
 }
 [data-theme="guinda"] {
   --primary: #691c32; --primary-dark: #4a1323; --primary-soft: #f5e8ec; --accent: #bc955c;
@@ -34,7 +36,7 @@
   --primary: #5b8def; --primary-dark: #3f6fd1; --primary-soft: #1e2a3d; --accent: #d4b06a;
   --sidebar-bg: #11161d; --sidebar-hover: #1c2430; --sidebar-text: #e5e9f0;
   --bg: #0d1117; --surface: #161b22; --surface-2: #1c222b; --text: #e6edf3; --muted: #9aa4b2; --border: #2d3540;
-  --st-capturado: #4f8ff7; --st-revision: #f0a33a; --st-terminado: #34a853; --st-cancelado: #ef5350;
+  --st-capturado: #4f8ff7; --st-curso: #22b3d0; --st-detenido: #a78bfa; --st-terminado: #34a853; --st-cancelado: #ef5350; --st-vencida: #f87171;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -187,7 +189,16 @@ legend { padding: 0 6px; font-weight: 700; color: var(--primary); font-size: 14p
   background-repeat: no-repeat; background-position: right 10px center;
 }
 .st-capturado { background-color: var(--st-capturado); }
-.st-revision { background-color: var(--st-revision); }
+.st-curso { background-color: var(--st-curso); }
+.st-detenido { background-color: var(--st-detenido); }
+.st-vencida { background-color: var(--st-vencida); }
+.pr-alta { background: #b91c1c; }
+.pr-media { background: #d97706; }
+.pr-baja { background: #64748b; }
+.badge-vencida { background: var(--st-vencida); }
+[data-estado-cell] .badge-vencida { display: block; width: fit-content; margin-top: 4px; }
+#gTableBody td { padding: 9px 8px; }
+#gTableBody td:nth-child(4) { max-width: 170px; }
 .st-terminado { background-color: var(--st-terminado); }
 .st-cancelado { background-color: var(--st-cancelado); }
 .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
@@ -309,3 +320,34 @@ legend { padding: 0 6px; font-weight: 700; color: var(--primary); font-size: 14p
   .print-area .num { text-align: right; }
   .print-area tr { page-break-inside: avoid; }
 }
+
+/* ===== v2: huella, donas, barras ===== */
+.btn-bio { min-height: 54px; font-size: 17px; }
+.lock-or { text-align: center; color: var(--muted); font-size: 13px; margin: 14px 0 10px; }
+.field-hint { display: block; font-size: 12px; color: var(--st-revision, #d97706); margin-top: 4px; min-height: 0; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.cards .card.alert .card-number { color: var(--c); }
+.donut-wrap { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.donut { width: 210px; height: 210px; flex-shrink: 0; cursor: pointer; }
+.donut-legend { list-style: none; flex: 1; min-width: 160px; }
+.donut-legend li { display: flex; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+.donut-legend li:hover { background: var(--surface-2); }
+.donut-legend .sw { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+.donut-legend .lb { flex: 1; }
+.donut-legend .ct { font-weight: 700; }
+.donut-legend .pc { color: var(--muted); font-size: 12px; min-width: 38px; text-align: right; }
+.bar-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin: 6px 0 12px; }
+.bar-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.bar-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.bars { display: flex; flex-direction: column; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: 180px 1fr 70px; align-items: center; gap: 10px; cursor: pointer; padding: 4px; border-radius: 6px; }
+.bar-row:hover { background: var(--surface-2); }
+.bar-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { display: flex; height: 26px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+.bar-track > div { height: 100%; }
+.bar-total { font-weight: 700; font-size: 14px; text-align: right; }
+.bar-total small { display: block; color: var(--st-vencida); font-weight: 600; font-size: 11px; }
+@media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 820px) { .bar-row { grid-template-columns: 120px 1fr 60px; } }
+@media (max-width: 520px) { .grid-3 { grid-template-columns: 1fr; } }
+.panel > .actions, .panel > p.muted + .actions { margin-top: 12px; }
