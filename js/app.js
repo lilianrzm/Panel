@@ -23,7 +23,7 @@
   ];
   const PALETTE = ['#2563eb', '#d97706', '#059669', '#db2777', '#7c3aed', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#be123c'];
   const GRAY = '#94a3b8';
-  const APP_VERSION = '6 · 18/11/2026';
+  const APP_VERSION = '7 · 18/11/2026';
   const DEFAULT_NAME = 'Gestor-S';
   const PREFS_KEY = 'panel.prefs';
   const LOCK_WHEN_HIDDEN_MS = 30 * 1000;
@@ -497,6 +497,7 @@
     const Lc = applyFilters(data.gestiones, Object.assign({}, df, { estatus: df.estatus === 'vencidas' ? 'vencidas' : '' }));
     const Lr = applyFilters(data.gestiones, Object.assign({}, df, { responsable: '' }));
     const activos = Object.values(df).filter(Boolean).length;
+    setFbarCount('dash', activos);
     $('dClear').classList.toggle('hidden', !activos);
     $('dSummary').textContent = activos
       ? `Mostrando ${L.length} de ${data.gestiones.length} gestiones con ${activos === 1 ? '1 filtro' : activos + ' filtros'}. Toca otra vez una parte de la gráfica para quitar su filtro.`
@@ -562,6 +563,8 @@
     } else n.classList.add('hidden');
   }
 
+  const ICON_BARS = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="2" y="3" width="11" height="3.2" rx="1.2"/><rect x="2" y="8.4" width="16" height="3.2" rx="1.2"/><rect x="2" y="13.8" width="7" height="3.2" rx="1.2"/></svg>';
+  const ICON_DONUT = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3.4" aria-hidden="true"><path d="M10 3.3a6.7 6.7 0 1 1-6.4 4.6"/><path d="M4.6 5.2A6.7 6.7 0 0 1 8.2 3.5" opacity=".45"/></svg>';
   // Cada gráfica puede verse en círculo o en barras (se recuerda la elección)
   function chartMode(kind) { return ((getPrefs().charts || {})[kind]) || 'donut'; }
   function setChartMode(kind, mode) {
@@ -574,7 +577,14 @@
     const mode = chartMode(kind);
     const ids = kind === 'estado' ? { wrap: 'wrapEstado', bars: 'barsEstado', canvas: 'donutEstado', legend: 'legendEstado', k: 'estado', attr: 'est' }
       : { wrap: 'wrapResp', bars: 'barsResp', canvas: 'donutResp', legend: 'legendResp', k: 'responsable', attr: 'resp' };
-    document.querySelectorAll(`.seg[data-chart="${kind}"] button`).forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    const tg = document.querySelector(`.icon-toggle[data-chart="${kind}"]`);
+    if (tg) {
+      const next = mode === 'donut' ? 'bars' : 'donut';
+      tg.innerHTML = next === 'bars' ? ICON_BARS : ICON_DONUT;
+      tg.title = next === 'bars' ? 'Ver en barras' : 'Ver en círculo';
+      tg.setAttribute('aria-label', tg.title);
+      tg.dataset.next = next;
+    }
     $(ids.wrap).classList.toggle('hidden', mode !== 'donut');
     $(ids.bars).classList.toggle('hidden', mode !== 'bars');
     if (mode === 'donut') drawDonut(ids.canvas, ids.legend, slices, ids.k, selected);
@@ -837,6 +847,7 @@
     const q = norm($('gSearch').value);
     const f = { estatus: $('gFilterEstatus').value, responsable: $('gFilterResponsable').value, dependencia: $('gFilterDependencia').value, prioridad: $('gFilterPrioridad').value };
     const sinUb = $('gFilterSinUbicacion').checked;
+    setFbarCount('gestiones', Object.values(f).filter(Boolean).length + (q ? 1 : 0) + (sinUb ? 1 : 0) + (ui.carry ? Object.keys(ui.carry).length : 0));
     if (ui.carry) Object.assign(f, ui.carry);
     const cb = $('gCarry');
     if (ui.carry) {
@@ -1032,6 +1043,7 @@
     setupDirFilters();
     const q = norm($('dirSearch').value);
     const fd = $('dirDependencia').value;
+    setFbarCount('dir', (q ? 1 : 0) + (fd ? 1 : 0));
     const counts = {};
     data.gestiones.forEach(g => {
       const k = norm(g.responsable);
@@ -1195,6 +1207,7 @@
     fillSelect($('mMedio'), catalogOptions('medios', 'medio'), { all: 'Todos los medios' });
     fillSelect($('mFuente'), catalogOptions('fuentes', 'fuente'), { all: 'Todas las fuentes' });
     const view = $('mView').value;
+    setFbarCount('mapa', Object.values(mapFilters()).filter(Boolean).length);
     const groups = mapGroups(view, applyFilters(data.gestiones, mapFilters()));
     const area = $('mapArea');
     const geo = await getCarto(view);
@@ -1417,6 +1430,7 @@
 
   function renderReportes() {
     setupReportFilters();
+    setFbarCount('reportes', R_IDS.filter(id => $(id).value).length);
     const { list, by, rows } = reportData();
     const monto = list.reduce((s, g) => s + (Number(g.monto) || 0), 0);
     $('rSummaryTitle').textContent = `Resumen por ${GROUP_LABEL[by].toLowerCase()}`;
@@ -1643,10 +1657,7 @@
     $('legendResp').addEventListener('click', e => { const li = e.target.closest('[data-resp]'); if (li && li.dataset.resp !== '__otros') toggleDash('dResponsable', li.dataset.resp); });
     $('respBars').addEventListener('click', e => { const r = e.target.closest('[data-resp]'); if (r) toggleDash('dResponsable', r.dataset.resp); });
     $('dViewList').addEventListener('click', () => goGestiones({}));
-    document.querySelectorAll('.seg[data-chart]').forEach(seg => seg.addEventListener('click', e => {
-      const b = e.target.closest('button[data-mode]');
-      if (b) setChartMode(seg.dataset.chart, b.dataset.mode);
-    }));
+    document.querySelectorAll('.icon-toggle[data-chart]').forEach(b => b.addEventListener('click', () => setChartMode(b.dataset.chart, b.dataset.next || 'bars')));
     $('barsEstado').addEventListener('click', e => { const r = e.target.closest('[data-est]'); if (r) toggleDash('dEstatus', r.dataset.est); });
     $('barsResp').addEventListener('click', e => { const r = e.target.closest('[data-resp]'); if (r && r.dataset.resp !== '__otros') toggleDash('dResponsable', r.dataset.resp); });
 
@@ -1817,6 +1828,7 @@
     applyPrefs();
     ['fDependencia', 'gFilterDependencia', 'mDependencia', 'rDependencia', 'dDependencia', 'cDependencia', 'dirDependencia',
       'dResponsable', 'gFilterResponsable', 'mResponsable', 'rResponsable'].forEach(id => Combo.enhance($(id)));
+    setupCollapsibles();
     bind();
     if (!Vault.supported()) {
       showLock('unlockForm');
@@ -1828,6 +1840,46 @@
     showLock(Vault.exists() ? 'unlockForm' : 'setupForm');
     document.querySelectorAll('[data-app-version]').forEach(el => { el.textContent = 'Versión ' + APP_VERSION; });
     setupUpdates();
+  }
+
+  // ================= Barras de filtros plegables =================
+  function setupCollapsibles() {
+    const state = getPrefs().collapsed || {};
+    document.querySelectorAll('[data-collapsible]').forEach(body => {
+      const key = body.dataset.collapsible;
+      const head = document.createElement('div');
+      head.className = 'fbar-head';
+      head.innerHTML = `<button type="button" class="fbar-toggle" aria-expanded="true"><span class="chev">▼</span><span>${esc(body.dataset.title || 'Filtros')}</span><span class="fbar-count" data-fbar-count="${key}"></span></button><div class="fbar-slot"></div>`;
+      body.parentNode.insertBefore(head, body);
+      body.classList.add('fbar-body');
+      body.querySelectorAll('[data-fbar-action]').forEach(a => head.querySelector('.fbar-slot').appendChild(a));
+      const apply = closed => {
+        head.classList.toggle('collapsed', closed);
+        head.querySelector('.fbar-toggle').setAttribute('aria-expanded', String(!closed));
+        if (closed) {
+          body.style.maxHeight = body.scrollHeight + 'px';
+          void body.offsetHeight;
+          body.classList.add('closed');
+        } else {
+          body.classList.remove('closed');
+          body.style.maxHeight = body.scrollHeight + 'px';
+          setTimeout(() => { if (!body.classList.contains('closed')) body.style.maxHeight = 'none'; }, 320);
+        }
+      };
+      apply(!!state[key]);
+      head.querySelector('.fbar-toggle').addEventListener('click', () => {
+        const closed = !head.classList.contains('collapsed');
+        apply(closed);
+        const p = getPrefs();
+        p.collapsed = Object.assign({}, p.collapsed, { [key]: closed });
+        localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+      });
+    });
+  }
+  // Muestra cuántos filtros hay puestos aunque la barra esté oculta
+  function setFbarCount(key, n) {
+    const el = document.querySelector(`[data-fbar-count="${key}"]`);
+    if (el) el.textContent = n ? `${n} ${n === 1 ? 'filtro' : 'filtros'}` : '';
   }
 
   // ================= Actualizaciones =================

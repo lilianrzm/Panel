@@ -113,7 +113,7 @@
       <!-- INICIO -->
       <section class="section active" id="dashboard">
         <div class="panel dash-filters">
-          <div class="toolbar">
+          <div class="toolbar" data-collapsible="dash" data-title="Filtros del tablero">
             <select class="input" id="dEstatus" aria-label="Estado"></select>
             <label class="inline-label">Desde <input type="date" class="input" id="dDesde"></label>
             <label class="inline-label">Hasta <input type="date" class="input" id="dHasta"></label>
@@ -130,14 +130,14 @@
         <div class="grid-2">
           <div class="panel">
             <div class="panel-head"><h3 class="panel-title">Tareas por estado</h3>
-              <div class="seg" data-chart="estado"><button type="button" data-mode="donut">◯ Círculo</button><button type="button" data-mode="bars">▤ Barras</button></div></div>
+              <button type="button" class="icon-toggle" data-chart="estado"></button></div>
             <p class="panel-hint">Toca una parte para filtrar todo el tablero.</p>
             <div class="donut-wrap" id="wrapEstado"><canvas id="donutEstado" class="donut"></canvas><ul class="donut-legend" id="legendEstado"></ul></div>
             <div class="hbars hidden" id="barsEstado"></div>
           </div>
           <div class="panel">
             <div class="panel-head"><h3 class="panel-title">Tareas por responsable</h3>
-              <div class="seg" data-chart="resp"><button type="button" data-mode="donut">◯ Círculo</button><button type="button" data-mode="bars">▤ Barras</button></div></div>
+              <button type="button" class="icon-toggle" data-chart="resp"></button></div>
             <p class="panel-hint">Toca una persona para filtrar todo el tablero.</p>
             <div class="donut-wrap" id="wrapResp"><canvas id="donutResp" class="donut"></canvas><ul class="donut-legend" id="legendResp"></ul></div>
             <div class="hbars hidden" id="barsResp"></div>
@@ -165,14 +165,14 @@
       <!-- GESTIONES -->
       <section class="section" id="gestiones">
         <div class="panel">
-          <div class="toolbar">
+          <div class="toolbar" data-collapsible="gestiones" data-title="Buscar y filtrar">
             <input type="search" class="input" id="gSearch" placeholder="Buscar por nombre, colonia, folio…">
             <select class="input" id="gFilterEstatus"></select>
             <select class="input" id="gFilterResponsable"></select>
             <select class="input" id="gFilterDependencia"></select>
             <select class="input" id="gFilterPrioridad"></select>
             <label class="check"><input type="checkbox" id="gFilterSinUbicacion"> Sin ubicación</label>
-            <button class="btn btn-primary" data-action="new-gestion">＋ Nueva gestión</button>
+            <button class="btn btn-primary" data-action="new-gestion" data-fbar-action>＋ Nueva gestión</button>
           </div>
           <div class="carry hidden" id="gCarry"></div>
           <div class="table-wrap">
@@ -193,7 +193,7 @@
       <!-- MAPA -->
       <section class="section" id="mapa">
         <div class="panel">
-          <div class="toolbar">
+          <div class="toolbar" data-collapsible="mapa" data-title="Filtros del mapa">
             <select class="input" id="mView">
               <option value="seccion">Vista por sección</option>
               <option value="colonia">Vista por colonia</option>
@@ -239,16 +239,18 @@
       <!-- DIRECTORIO -->
       <section class="section" id="directorio">
         <div class="panel">
+          <div data-collapsible="dir" data-title="Buscar y filtrar">
           <div class="toolbar">
             <input type="search" class="input" id="dirSearch" placeholder="Buscar por nombre, dependencia, teléfono…">
             <select class="input" id="dirDependencia" aria-label="Dependencia"></select>
-            <button class="btn btn-primary" data-action="new-contacto">＋ Nuevo contacto</button>
+            <button class="btn btn-primary" data-action="new-contacto" data-fbar-action>＋ Nuevo contacto</button>
           </div>
           <div class="actions" style="margin-bottom:12px">
             <label class="btn btn-outline btn-sm file-btn">⬆ Importar Excel
               <input type="file" id="dirImport" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv">
             </label>
             <button class="btn btn-outline btn-sm" id="dirExport">⬇ Exportar Excel</button>
+          </div>
           </div>
           <div class="table-wrap">
             <table class="table">
@@ -263,8 +265,7 @@
       <!-- REPORTES -->
       <section class="section" id="reportes">
         <div class="panel">
-          <h3 class="panel-title">Filtros del reporte</h3>
-          <div class="filter-grid">
+          <div class="filter-grid" data-collapsible="reportes" data-title="Filtros del reporte">
             <label>Desde<input type="date" class="input" id="rDesde"></label>
             <label>Hasta<input type="date" class="input" id="rHasta"></label>
             <label>Estado<select class="input" id="rEstatus"></select></label>

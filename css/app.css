@@ -420,3 +420,19 @@ legend { padding: 0 6px; font-weight: 700; color: var(--primary); font-size: 14p
 
 .app-version { padding: 16px 22px; font-size: 12px; opacity: .6; }
 .sep { border: none; border-top: 1px solid var(--border); margin: 18px 0 12px; }
+
+/* ===== v7: barras de filtros plegables e ícono de gráfica ===== */
+.fbar-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.fbar-head.collapsed { margin-bottom: 0; }
+.fbar-toggle { display: inline-flex; align-items: center; gap: 8px; background: none; border: none; color: var(--text); font: 700 15px -apple-system, "Segoe UI", sans-serif; cursor: pointer; padding: 6px 4px; min-height: 40px; border-radius: 8px; }
+.fbar-toggle .chev { display: inline-block; transition: transform .25s; color: var(--muted); font-size: 13px; }
+.fbar-head.collapsed .chev { transform: rotate(-90deg); }
+.fbar-count { background: var(--primary); color: #fff; border-radius: 999px; font-size: 12px; padding: 2px 9px; font-weight: 700; }
+.fbar-count:empty { display: none; }
+.fbar-head .fbar-slot { margin-left: auto; display: flex; gap: 8px; }
+.fbar-body { transition: max-height .3s ease, opacity .25s; }
+.fbar-body.closed { max-height: 0 !important; opacity: 0; margin: 0 !important; pointer-events: none; overflow: hidden; }
+.dash-filters .fbar-head.collapsed + .fbar-body + .dash-summary { margin-top: 6px; }
+.icon-toggle { width: 38px; height: 38px; border-radius: 9px; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.icon-toggle:hover { color: var(--primary); border-color: var(--primary); }
+.icon-toggle svg { width: 20px; height: 20px; }
