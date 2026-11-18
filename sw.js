@@ -1,11 +1,12 @@
 /* Service worker: guarda la app en el iPad para que funcione sin internet.
    Solo guarda los archivos de la app; tus datos nunca pasan por aquí. */
-const CACHE = 'panel-v2';
+const CACHE = 'panel-v3';
 const FILES = [
   './',
   'index.html',
   'css/app.css',
   'js/vault.js',
+  'js/combo.js',
   'js/xlsx.js',
   'js/mapa.js',
   'js/app.js',

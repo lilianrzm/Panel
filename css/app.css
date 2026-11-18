@@ -351,3 +351,29 @@ legend { padding: 0 6px; font-weight: 700; color: var(--primary); font-size: 14p
 @media (max-width: 820px) { .bar-row { grid-template-columns: 120px 1fr 60px; } }
 @media (max-width: 520px) { .grid-3 { grid-template-columns: 1fr; } }
 .panel > .actions, .panel > p.muted + .actions { margin-top: 12px; }
+
+/* ===== v3: filtros del inicio y listas con búsqueda ===== */
+.dash-filters { padding: 14px 18px; }
+.dash-filters .toolbar { margin-bottom: 8px; }
+.dash-summary { display: flex; align-items: center; gap: 12px; min-height: 36px; }
+.dash-summary .muted { flex: 1; }
+.carry { display: flex; align-items: center; gap: 10px; background: var(--primary-soft); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
+.carry span { flex: 1; }
+.combo { position: relative; }
+.toolbar .combo { flex: 2 1 240px; }
+.filter-grid .combo { margin-top: 6px; }
+.filter-grid .combo .input { margin-top: 0; }
+.combo-native { display: none !important; }
+.combo-input { width: 100%; padding-right: 34px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='M11 11l4 4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; }
+.combo-input::-webkit-search-cancel-button { display: none; }
+.combo-list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 2500; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.18); max-height: 290px; overflow-y: auto; list-style: none; padding: 4px; -webkit-overflow-scrolling: touch; }
+.combo-list li { padding: 11px 12px; border-radius: 7px; cursor: pointer; font-size: 15px; line-height: 1.25; color: var(--text); }
+.combo-list li.active { background: var(--primary-soft); }
+.combo-list li.chosen { font-weight: 700; }
+.combo-list li.empty-opt { color: var(--muted); font-style: italic; }
+.combo-list li.none { color: var(--muted); cursor: default; }
+.combo-list mark { background: #fde68a; color: inherit; border-radius: 2px; padding: 0 1px; }
+.combo.up .combo-list { top: auto; bottom: calc(100% + 4px); }

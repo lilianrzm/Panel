@@ -98,7 +98,8 @@
     mapSelected: null,
     cal: (() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; })(),
     selectedDay: null,
-    donuts: {}
+    donuts: {},
+    carry: null
   };
   const cartoCache = {};
 
@@ -433,8 +434,32 @@
     return arr;
   }
 
+  const D_IDS = ['dDesde', 'dHasta', 'dResponsable', 'dDependencia', 'dPrioridad', 'dMedio', 'dFuente', 'dColonia'];
+  function dashFilters() {
+    return {
+      desde: $('dDesde').value, hasta: $('dHasta').value, responsable: $('dResponsable').value, dependencia: $('dDependencia').value,
+      prioridad: $('dPrioridad').value, medio: $('dMedio').value, fuente: $('dFuente').value, colonia: $('dColonia').value
+    };
+  }
+  function setupDashFilters() {
+    fillSelect($('dResponsable'), respOptions(), { all: 'Todos los responsables' });
+    fillSelect($('dDependencia'), catalogOptions('dependencias', 'dependencia'), { all: 'Todas las dependencias' });
+    fillSelect($('dPrioridad'), PRIORIDADES, { all: 'Todas las prioridades' });
+    fillSelect($('dMedio'), catalogOptions('medios', 'medio'), { all: 'Todos los medios' });
+    fillSelect($('dFuente'), catalogOptions('fuentes', 'fuente'), { all: 'Todas las fuentes' });
+    const col = [...uniqueBy('colonia', MapaGeo.normColonia)].map(([k, v]) => ({ id: k, label: v })).sort((a, b) => a.label.localeCompare(b.label, 'es'));
+    fillSelect($('dColonia'), col, { all: 'Todas las colonias' });
+  }
+
   function renderDashboard() {
-    const L = data.gestiones;
+    setupDashFilters();
+    const df = dashFilters();
+    const L = applyFilters(data.gestiones, df);
+    const activos = Object.values(df).filter(Boolean).length;
+    $('dClear').classList.toggle('hidden', !activos);
+    $('dSummary').textContent = activos
+      ? `Mostrando ${L.length} de ${data.gestiones.length} gestiones con ${activos === 1 ? '1 filtro' : activos + ' filtros'}.`
+      : `Mostrando todas las gestiones (${data.gestiones.length}). Usa los filtros para ver solo una parte.`;
     const abiertas = L.filter(g => !CERRADOS.includes(g.estatus)).length;
     const venc = L.filter(isVencida).length;
     const curso = L.filter(g => g.estatus === 'curso').length;
@@ -557,11 +582,17 @@
   }
 
   function goGestiones(f) {
+    // Lleva también los filtros que estén puestos en el Inicio
+    const df = ui.section === 'dashboard' ? dashFilters() : {};
     setupGestionFilters();
     $('gFilterEstatus').value = f.estatus || '';
-    $('gFilterResponsable').value = f.responsable && f.responsable !== '__otros' ? f.responsable : '';
-    $('gFilterDependencia').value = '';
-    $('gFilterPrioridad').value = '';
+    const resp = f.responsable && f.responsable !== '__otros' ? f.responsable : (df.responsable || '');
+    $('gFilterResponsable').value = resp;
+    $('gFilterDependencia').value = df.dependencia || '';
+    $('gFilterPrioridad').value = df.prioridad || '';
+    const carry = {};
+    ['desde', 'hasta', 'medio', 'fuente', 'colonia'].forEach(k => { if (df[k]) carry[k] = df[k]; });
+    ui.carry = Object.keys(carry).length ? carry : null;
     $('gFilterSinUbicacion').checked = !!f.sinUbicacion;
     $('gSearch').value = '';
     switchSection('gestiones');
@@ -624,6 +655,17 @@
     const q = norm($('gSearch').value);
     const f = { estatus: $('gFilterEstatus').value, responsable: $('gFilterResponsable').value, dependencia: $('gFilterDependencia').value, prioridad: $('gFilterPrioridad').value };
     const sinUb = $('gFilterSinUbicacion').checked;
+    if (ui.carry) Object.assign(f, ui.carry);
+    const cb = $('gCarry');
+    if (ui.carry) {
+      const c = ui.carry, parts = [];
+      if (c.desde || c.hasta) parts.push(`Ingreso ${c.desde ? fmtDate(c.desde) : '…'} a ${c.hasta ? fmtDate(c.hasta) : '…'}`);
+      if (c.medio) parts.push('Medio: ' + c.medio);
+      if (c.fuente) parts.push('Fuente: ' + c.fuente);
+      if (c.colonia) parts.push('Colonia: ' + (uniqueBy('colonia', MapaGeo.normColonia).get(c.colonia) || c.colonia));
+      cb.innerHTML = `<span>Filtros del Inicio: ${esc(parts.join(' · '))}</span><button class="btn btn-outline btn-sm" data-action="clear-carry">✕ Quitar</button>`;
+      cb.classList.remove('hidden');
+    } else cb.classList.add('hidden');
     const list = applyFilters(data.gestiones, f).filter(g => {
       if (sinUb && (g.colonia || g.seccion)) return false;
       if (q) {
@@ -1203,7 +1245,7 @@
     $('lockBtn').addEventListener('click', lockNow);
     $('menuBtn').addEventListener('click', () => { $('sidebar').classList.add('open'); $('sidebarBackdrop').classList.add('open'); });
     $('sidebarBackdrop').addEventListener('click', closeSidebar);
-    $('sidebarMenu').addEventListener('click', e => { const li = e.target.closest('li'); if (li) switchSection(li.dataset.section); });
+    $('sidebarMenu').addEventListener('click', e => { const li = e.target.closest('li'); if (li) { if (li.dataset.section === 'gestiones') ui.carry = null; switchSection(li.dataset.section); } });
 
     // Inicio
     $('taskCards').addEventListener('click', e => {
@@ -1215,6 +1257,8 @@
     $('legendEstado').addEventListener('click', e => { const li = e.target.closest('[data-est]'); if (li) goGestiones({ estatus: li.dataset.est }); });
     $('legendResp').addEventListener('click', e => { const li = e.target.closest('[data-resp]'); if (li) goGestiones({ responsable: li.dataset.resp }); });
     $('respBars').addEventListener('click', e => { const r = e.target.closest('[data-resp]'); if (r) goGestiones({ responsable: r.dataset.resp }); });
+    D_IDS.forEach(id => $(id).addEventListener('change', renderDashboard));
+    $('dClear').addEventListener('click', () => { D_IDS.forEach(id => { $(id).value = ''; }); renderDashboard(); });
     $('hotList').addEventListener('click', e => { const li = e.target.closest('li[data-colonia]'); if (li) goToMapColonia(li.dataset.colonia); });
     let rz;
     window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (data && ui.section === 'dashboard') renderDashboard(); }, 200); });
@@ -1229,6 +1273,7 @@
         else if (act === 'go-backup') { switchSection('config'); $('backupPanel').scrollIntoView({ behavior: 'smooth' }); }
         else if (act === 'ver-sin-ubicacion') goGestiones({ sinUbicacion: true });
         else if (act === 'agenda-proximos') { ui.selectedDay = null; renderEventos(); }
+        else if (act === 'clear-carry') { ui.carry = null; renderGestiones(); }
         return;
       }
       const og = e.target.closest('[data-open-gestion]');
@@ -1357,6 +1402,7 @@
   // ================= Inicio de la app =================
   function start() {
     applyPrefs();
+    ['fDependencia', 'gFilterDependencia', 'mDependencia', 'rDependencia', 'dDependencia'].forEach(id => Combo.enhance($(id)));
     bind();
     if (!Vault.supported()) {
       showLock('unlockForm');

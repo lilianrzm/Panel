@@ -106,6 +106,19 @@
 
       <!-- INICIO -->
       <section class="section active" id="dashboard">
+        <div class="panel dash-filters">
+          <div class="toolbar">
+            <label class="inline-label">Desde <input type="date" class="input" id="dDesde"></label>
+            <label class="inline-label">Hasta <input type="date" class="input" id="dHasta"></label>
+            <select class="input" id="dResponsable" aria-label="Responsable"></select>
+            <select class="input" id="dDependencia" aria-label="Dependencia"></select>
+            <select class="input" id="dPrioridad" aria-label="Prioridad"></select>
+            <select class="input" id="dMedio" aria-label="Medio de recepción"></select>
+            <select class="input" id="dFuente" aria-label="Fuente de ingreso"></select>
+            <select class="input" id="dColonia" aria-label="Colonia"></select>
+          </div>
+          <div class="dash-summary"><span class="muted" id="dSummary"></span><button class="btn btn-outline btn-sm hidden" id="dClear">✕ Limpiar filtros</button></div>
+        </div>
         <div class="cards" id="taskCards"></div>
         <div class="grid-2">
           <div class="panel">
@@ -150,6 +163,7 @@
             <label class="check"><input type="checkbox" id="gFilterSinUbicacion"> Sin ubicación</label>
             <button class="btn btn-primary" data-action="new-gestion">＋ Nueva gestión</button>
           </div>
+          <div class="carry hidden" id="gCarry"></div>
           <div class="table-wrap">
             <table class="table">
               <thead>
@@ -253,6 +267,7 @@
         </div>
         <div class="panel">
           <h3 class="panel-title" id="rDetailTitle">Detalle</h3>
+          <div class="carry hidden" id="gCarry"></div>
           <div class="table-wrap">
             <table class="table">
               <thead>
@@ -480,6 +495,7 @@
   <datalist id="seccionesList"></datalist>
 
   <script src="js/vault.js"></script>
+  <script src="js/combo.js"></script>
   <script src="js/xlsx.js"></script>
   <script src="js/mapa.js"></script>
   <script src="js/app.js"></script>
