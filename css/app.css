@@ -417,3 +417,6 @@ legend { padding: 0 6px; font-weight: 700; color: var(--primary); font-size: 14p
 .count-btn { background: var(--primary-soft); color: var(--text); border: none; border-radius: 999px; padding: 5px 12px; font-weight: 700; cursor: pointer; font-size: 13px; min-height: 32px; white-space: nowrap; }
 .wa-btn { background: #16a34a; color: #fff; text-decoration: none; }
 @media (max-width: 820px) { .hb-row { grid-template-columns: 110px 1fr 70px; } }
+
+.app-version { padding: 16px 22px; font-size: 12px; opacity: .6; }
+.sep { border: none; border-top: 1px solid var(--border); margin: 18px 0 12px; }

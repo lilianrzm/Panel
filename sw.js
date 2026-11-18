@@ -1,7 +1,7 @@
 /* Service worker: guarda la app en el iPad para que funcione sin internet.
    Solo guarda los archivos de la app; tus datos nunca pasan por aquí.
    Con internet siempre trae la versión más nueva; sin internet usa la guardada. */
-const CACHE = 'panel-v5';
+const CACHE = 'panel-v6';
 const FILES = [
   './',
   'index.html',
@@ -18,7 +18,7 @@ const FILES = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {

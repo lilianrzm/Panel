@@ -23,6 +23,7 @@
   ];
   const PALETTE = ['#2563eb', '#d97706', '#059669', '#db2777', '#7c3aed', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#be123c'];
   const GRAY = '#94a3b8';
+  const APP_VERSION = '6 · 18/11/2026';
   const DEFAULT_NAME = 'Gestor-S';
   const PREFS_KEY = 'panel.prefs';
   const LOCK_WHEN_HIDDEN_MS = 30 * 1000;
@@ -1825,9 +1826,38 @@
     }
     setupAutoLock();
     showLock(Vault.exists() ? 'unlockForm' : 'setupForm');
-    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    }
+    document.querySelectorAll('[data-app-version]').forEach(el => { el.textContent = 'Versión ' + APP_VERSION; });
+    setupUpdates();
+  }
+
+  // ================= Actualizaciones =================
+  function setupUpdates() {
+    if (!('serviceWorker' in navigator) || !(location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) return;
+    let reloading = false;
+    const hadController = !!navigator.serviceWorker.controller; // la primera instalación no cuenta como actualización
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading || !hadController) return;
+      // Si está bloqueada se recarga sola; si estás trabajando, se avisa
+      if (!Vault.isOpen()) { reloading = true; location.reload(); }
+      else $('updateBanner').classList.remove('hidden');
+    });
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+    }).catch(() => {});
+    $('updateNow').addEventListener('click', () => forceUpdate());
+    $('cfgUpdate').addEventListener('click', () => forceUpdate());
+  }
+  // Borra solo los archivos guardados de la app (no tus datos) y recarga la versión más nueva
+  async function forceUpdate() {
+    toast('Buscando la versión más nueva…');
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    } catch (e) { /* sin service worker */ }
+    location.reload();
   }
 
   start();

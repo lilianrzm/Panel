@@ -90,6 +90,7 @@
           <li data-section="config"><span class="ico">⚙️</span> Configuración</li>
         </ul>
       </nav>
+      <p class="app-version" data-app-version></p>
     </aside>
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
@@ -100,6 +101,10 @@
         <button class="btn btn-outline" id="lockBtn">🔒 Bloquear</button>
       </header>
 
+      <div class="banner hidden" id="updateBanner">
+        <span>Hay una versión nueva de la app.</span>
+        <button class="btn btn-primary btn-sm" id="updateNow">Actualizar ahora</button>
+      </div>
       <div class="banner hidden" id="backupBanner">
         <span id="backupBannerText"></span>
         <button class="btn btn-primary btn-sm" data-action="go-backup">Hacer respaldo</button>
@@ -336,6 +341,9 @@
               </select>
             </div>
             <button class="btn btn-primary" id="cfgSaveGeneral">Guardar</button>
+            <hr class="sep">
+            <p class="muted">Versión instalada: <strong data-app-version></strong></p>
+            <button class="btn btn-outline btn-sm" id="cfgUpdate" style="margin-top:8px">🔄 Buscar actualización</button>
           </div>
 
           <div class="panel" id="backupPanel">
