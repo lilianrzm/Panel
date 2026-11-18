@@ -130,5 +130,67 @@ const XLSX = (() => {
     return zip(files);
   }
 
-  return { build };
+  // Lee la primera hoja de un .xlsx → filas (arreglos de texto)
+  async function read(file) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+    let e = buf.length - 22;
+    while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+    if (e < 0) throw new Error('El archivo no es un Excel (.xlsx).');
+    const n = dv.getUint16(e + 10, true);
+    let p = dv.getUint32(e + 16, true);
+    const dec = new TextDecoder();
+    const files = {};
+    for (let i = 0; i < n; i++) {
+      const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+      const nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+      const off = dv.getUint32(p + 42, true);
+      files[dec.decode(buf.subarray(p + 46, p + 46 + nl))] = { method, csize, off };
+      p += 46 + nl + xl + cl;
+    }
+    async function get(name) {
+      const f = files[name];
+      if (!f) return null;
+      const start = f.off + 30 + dv.getUint16(f.off + 26, true) + dv.getUint16(f.off + 28, true);
+      const raw = buf.subarray(start, start + f.csize);
+      if (f.method === 0) return dec.decode(raw);
+      if (typeof DecompressionStream === 'undefined') throw new Error('Actualiza iPadOS para poder importar archivos de Excel.');
+      const out = await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+      return dec.decode(out);
+    }
+    const parse = t => new DOMParser().parseFromString(t, 'application/xml');
+    const textOf = el => [...el.getElementsByTagName('t')].map(t => t.textContent).join('');
+    const shared = [];
+    const ss = await get('xl/sharedStrings.xml');
+    if (ss) [...parse(ss).getElementsByTagName('si')].forEach(si => shared.push(textOf(si)));
+    let sheetPath = 'xl/worksheets/sheet1.xml';
+    const wbx = await get('xl/workbook.xml'), rels = await get('xl/_rels/workbook.xml.rels');
+    if (wbx && rels) {
+      const first = parse(wbx).getElementsByTagName('sheet')[0];
+      const rid = first && (first.getAttribute('r:id') || first.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id'));
+      const rel = [...parse(rels).getElementsByTagName('Relationship')].find(r => r.getAttribute('Id') === rid);
+      if (rel) { const t = rel.getAttribute('Target'); sheetPath = t.startsWith('/') ? t.slice(1) : 'xl/' + t.replace(/^\.\//, ''); }
+    }
+    const sx = await get(sheetPath);
+    if (!sx) throw new Error('No se encontró la hoja en el archivo.');
+    const colIndex = ref => { let c = 0; for (const ch of ref.replace(/\d/g, '')) c = c * 26 + ch.charCodeAt(0) - 64; return c - 1; };
+    return [...parse(sx).getElementsByTagName('row')].map(row => {
+      const arr = [];
+      [...row.getElementsByTagName('c')].forEach((c, k) => {
+        const ref = c.getAttribute('r');
+        const idx = ref ? colIndex(ref) : k;
+        const t = c.getAttribute('t');
+        const v = c.getElementsByTagName('v')[0];
+        let val = '';
+        if (t === 's') val = shared[Number(v && v.textContent)] || '';
+        else if (t === 'inlineStr') val = textOf(c);
+        else val = v ? v.textContent : '';
+        arr[idx] = String(val).trim();
+      });
+      for (let i = 0; i < arr.length; i++) if (arr[i] === undefined) arr[i] = '';
+      return arr;
+    });
+  }
+
+  return { build, read };
 })();

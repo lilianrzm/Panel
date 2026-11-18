@@ -144,5 +144,93 @@ const Combo = (() => {
     sync();
   }
 
-  return { enhance };
+  /*
+   * Sugerencias para un campo de texto libre: muestra opciones mientras escribes,
+   * pero también acepta un valor nuevo que no esté en la lista.
+   * provider() → [{ value, label, sub, data }]
+   */
+  function suggest(input, provider, opts = {}) {
+    const wrap = document.createElement('div');
+    wrap.className = 'combo';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('spellcheck', 'false');
+    input.removeAttribute('list');
+    const list = document.createElement('ul');
+    list.className = 'combo-list hidden';
+    wrap.appendChild(list);
+    let items = [];
+    let active = 0;
+    let isOpen = false;
+
+    function render() {
+      const q = norm(input.value);
+      const all = provider();
+      let found;
+      if (!q) found = all.slice();
+      else {
+        const scored = [];
+        all.forEach(it => {
+          const t = norm(it.label), sub = norm(it.sub || '');
+          let s = -1;
+          if (t.startsWith(q)) s = 0;
+          else if ((' ' + t).includes(' ' + q)) s = 1;
+          else if (initials(it.label).startsWith(q.replace(/\s/g, ''))) s = 2;
+          else if (t.includes(q)) s = 3;
+          else if (sub.includes(q) || initials(it.sub || '').startsWith(q.replace(/\s/g, ''))) s = 4;
+          if (s >= 0) scored.push({ it, s });
+        });
+        scored.sort((a, b) => a.s - b.s);
+        found = scored.map(x => x.it);
+      }
+      items = found.slice(0, 40);
+      const exact = q && all.some(it => norm(it.value) === q);
+      const free = q && !exact ? input.value.trim() : '';
+      active = Math.min(active, Math.max(0, items.length - 1));
+      list.innerHTML = items.map((it, i) => `<li data-i="${i}" class="${i === active ? 'active' : ''}">${highlight(it.label, q)}${it.sub ? `<small>${highlight(it.sub, q)}</small>` : ''}</li>`).join('') +
+        (free ? `<li class="free" data-free="1">＋ Usar “${esc(free)}” (nombre nuevo)</li>` : '') +
+        (!items.length && !free ? '<li class="none">Escribe un nombre</li>' : '');
+    }
+    function open() {
+      isOpen = true;
+      list.classList.remove('hidden');
+      const r = input.getBoundingClientRect();
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      wrap.classList.toggle('up', vh - r.bottom < 240 && r.top > vh - r.bottom);
+      render();
+    }
+    function close() { isOpen = false; list.classList.add('hidden'); }
+    function pick(it) {
+      if (it) input.value = it.value;
+      close();
+      input.blur();
+      if (opts.onPick) opts.onPick(it || null, input.value);
+    }
+    input.addEventListener('focus', () => { active = 0; open(); });
+    input.addEventListener('input', () => { active = 0; open(); });
+    input.addEventListener('keydown', e => {
+      if (!isOpen) return;
+      if (e.key === 'ArrowDown') { active = Math.min(items.length - 1, active + 1); render(); e.preventDefault(); }
+      else if (e.key === 'ArrowUp') { active = Math.max(0, active - 1); render(); e.preventDefault(); }
+      else if (e.key === 'Enter') { e.preventDefault(); pick(norm(input.value) && items[active] ? items[active] : null); }
+      else if (e.key === 'Escape') close();
+    });
+    list.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      const li = e.target.closest('li');
+      if (!li || li.classList.contains('none')) return;
+      if (li.dataset.free) pick(null);
+      else pick(items[Number(li.dataset.i)]);
+    });
+    input.addEventListener('blur', () => setTimeout(() => {
+      if (!isOpen) return;
+      close();
+      if (opts.onPick) opts.onPick(null, input.value); // valor escrito a mano
+    }, 150));
+    return { close };
+  }
+
+  return { enhance, suggest };
 })();

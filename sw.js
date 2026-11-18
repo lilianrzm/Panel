@@ -1,6 +1,7 @@
 /* Service worker: guarda la app en el iPad para que funcione sin internet.
-   Solo guarda los archivos de la app; tus datos nunca pasan por aquí. */
-const CACHE = 'panel-v4';
+   Solo guarda los archivos de la app; tus datos nunca pasan por aquí.
+   Con internet siempre trae la versión más nueva; sin internet usa la guardada. */
+const CACHE = 'panel-v5';
 const FILES = [
   './',
   'index.html',
@@ -28,19 +29,21 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Primero lo guardado; en segundo plano se actualiza si hay conexión
+function timeout(ms) { return new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms)); }
+
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  e.respondWith(
-    caches.open(CACHE).then(async cache => {
+  e.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    try {
+      const res = await Promise.race([fetch(req, { cache: 'no-cache' }), timeout(4000)]);
+      if (res && res.ok) cache.put(req, res.clone());
+      return res;
+    } catch (err) {
       const cached = await cache.match(req, { ignoreSearch: true }) ||
         (req.mode === 'navigate' ? await cache.match('index.html') : null);
-      const network = fetch(req).then(res => {
-        if (res && res.ok) cache.put(req, res.clone());
-        return res;
-      }).catch(() => null);
-      return cached || (await network) || new Response('Sin conexión', { status: 503 });
-    })
-  );
+      return cached || new Response('Sin conexión', { status: 503 });
+    }
+  })());
 });

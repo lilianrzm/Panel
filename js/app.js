@@ -27,7 +27,8 @@
   const PREFS_KEY = 'panel.prefs';
   const LOCK_WHEN_HIDDEN_MS = 30 * 1000;
   const BACKUP_REMINDER_DAYS = 7;
-  const SCHEMA = 2;
+  const SCHEMA = 3;
+  const GOB = 'Gobierno del Estado';
 
   const DEPENDENCIAS = [
     'Presidencia Municipal',
@@ -73,10 +74,12 @@
     return {
       gestiones: [],
       eventos: [],
+      directorio: [],
       config: {
         schema: SCHEMA,
         nextId: 1,
         nextEventoId: 1,
+        nextContactoId: 1,
         autoLockMin: 5,
         lastBackup: null,
         catalogos: { dependencias: [...DEPENDENCIAS], responsables: [], medios: [...MEDIOS], fuentes: [...FUENTES], tipos: [...TIPOS], municipios: [...MUNICIPIOS] }
@@ -99,7 +102,8 @@
     cal: (() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; })(),
     selectedDay: null,
     donuts: {},
-    carry: null
+    carry: null,
+    editingContacto: null
   };
   const cartoCache = {};
 
@@ -120,6 +124,7 @@
   const dash = v => (v === null || v === undefined || v === '') ? '—' : v;
   const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const isGob = d => norm(d) === norm(GOB);
   const isVencida = g => !!g.fechaLimite && g.fechaLimite < today() && !CERRADOS.includes(g.estatus);
   const CURP_RE = /^[A-Z][AEIOUX][A-Z]{2}\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[HMX][A-Z]{2}[B-DF-HJ-NP-TV-Z]{3}[A-Z\d]\d$/;
 
@@ -228,7 +233,8 @@
   // Responsables: catálogo + los escritos en gestiones (agrupados sin importar mayúsculas/acentos)
   function responsablesMap() {
     const map = new Map();
-    (data.config.catalogos.responsables || []).forEach(r => { if (r.trim()) map.set(norm(r), r.trim()); });
+    (data.directorio || []).forEach(c => { if ((c.nombre || '').trim()) map.set(norm(c.nombre), c.nombre.trim()); });
+    (data.config.catalogos.responsables || []).forEach(r => { if (r.trim() && !map.has(norm(r))) map.set(norm(r), r.trim()); });
     uniqueBy('responsable').forEach((v, k) => { if (!map.has(k)) map.set(k, v); });
     return map;
   }
@@ -283,9 +289,11 @@
     const def = newData();
     data.gestiones = data.gestiones || [];
     data.eventos = data.eventos || [];
+    data.directorio = data.directorio || [];
     data.config = Object.assign(def.config, data.config || {}, { schema: (data.config && data.config.schema) || 1 });
     const cat = data.config.catalogos = Object.assign({}, def.config.catalogos, data.config.catalogos || {});
     if (data.config.schema >= SCHEMA) return false;
+    if (data.config.schema >= 2) { data.config.schema = SCHEMA; return true; }
     // Esquema 1 → 2
     const extraDeps = (cat.dependencias || []).filter(d => !OLD_DEPENDENCIAS.includes(d) && !DEPENDENCIAS.includes(d));
     cat.dependencias = [...DEPENDENCIAS, ...extraDeps];
@@ -388,8 +396,8 @@
   }
 
   // ================= Navegación =================
-  const TITLES = { dashboard: 'Inicio', gestiones: 'Gestiones Ciudadanas', mapa: 'Mapa de Calor', eventos: 'Eventos y Agenda', reportes: 'Reportes', config: 'Configuración' };
-  const RENDER = () => ({ dashboard: renderDashboard, gestiones: renderGestiones, mapa: renderMapa, eventos: renderEventos, reportes: renderReportes, config: renderConfig });
+  const TITLES = { dashboard: 'Inicio', gestiones: 'Gestiones Ciudadanas', mapa: 'Mapa de Calor', eventos: 'Eventos y Agenda', directorio: 'Directorio de Enlaces', reportes: 'Reportes', config: 'Configuración' };
+  const RENDER = () => ({ dashboard: renderDashboard, gestiones: renderGestiones, mapa: renderMapa, eventos: renderEventos, directorio: renderDirectorio, reportes: renderReportes, config: renderConfig });
   function switchSection(section) {
     ui.section = section;
     if (section !== 'config') applyPrefs(); // descarta la vista previa de tema no guardada
@@ -411,6 +419,9 @@
     $('responsablesList').innerHTML = opts([...responsablesMap().values()]);
     $('tiposList').innerHTML = opts(catalogOptions('tipos', 'tipo'));
     $('municipiosList').innerHTML = opts(catalogOptions('municipios', 'municipio'));
+    const areas = new Map();
+    [...data.gestiones, ...data.directorio].forEach(x => { if (x.area && !areas.has(norm(x.area))) areas.set(norm(x.area), x.area); });
+    $('areasList').innerHTML = opts([...areas.values()].sort((a, b) => a.localeCompare(b, 'es')));
   }
 
   // ================= Inicio =================
@@ -511,7 +522,7 @@
 
     // Dona por estado
     const estSlices = ESTATUS.map(e => ({ key: e.id, label: e.label, value: Lc.filter(g => g.estatus === e.id).length, color: estColor(e.id) }));
-    drawDonut('donutEstado', 'legendEstado', estSlices, 'estado', df.estatus !== 'vencidas' ? df.estatus : '');
+    renderChart('estado', estSlices, df.estatus !== 'vencidas' ? df.estatus : '');
 
     // Dona y barras por responsable
     const rg = respGroups(Lr);
@@ -521,7 +532,7 @@
     const respSlices = top.map(r => ({ key: r.key, label: r.label, value: r.total, color: r.color }));
     if (rest.length) respSlices.push({ key: '__otros', label: `Otros (${rest.length})`, value: rest.reduce((s, r) => s + r.total, 0), color: '#cbd5e1' });
     if (sin) respSlices.push({ key: '~', label: 'Sin asignar', value: sin.total, color: GRAY });
-    drawDonut('donutResp', 'legendResp', respSlices, 'responsable', df.responsable);
+    renderChart('resp', respSlices, df.responsable);
 
     $('barLegend').innerHTML = ESTATUS.map(e => `<span><i style="background:${estColor(e.id)}"></i>${e.label}</span>`).join('');
     renderRespBars(respGroups(applyFilters(data.gestiones, Object.assign({}, df, { responsable: '' }))), df.responsable);
@@ -548,6 +559,56 @@
       n.innerHTML = `<span>📍 ${sinUb} ${sinUb === 1 ? 'gestión no tiene' : 'gestiones no tienen'} colonia ni sección, así que no aparecen en el mapa.</span><button class="btn btn-outline btn-sm" data-action="ver-sin-ubicacion">Ver</button>`;
       n.classList.remove('hidden');
     } else n.classList.add('hidden');
+  }
+
+  // Cada gráfica puede verse en círculo o en barras (se recuerda la elección)
+  function chartMode(kind) { return ((getPrefs().charts || {})[kind]) || 'donut'; }
+  function setChartMode(kind, mode) {
+    const p = getPrefs();
+    p.charts = Object.assign({}, p.charts, { [kind]: mode });
+    localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+    renderDashboard();
+  }
+  function renderChart(kind, slices, selected) {
+    const mode = chartMode(kind);
+    const ids = kind === 'estado' ? { wrap: 'wrapEstado', bars: 'barsEstado', canvas: 'donutEstado', legend: 'legendEstado', k: 'estado', attr: 'est' }
+      : { wrap: 'wrapResp', bars: 'barsResp', canvas: 'donutResp', legend: 'legendResp', k: 'responsable', attr: 'resp' };
+    document.querySelectorAll(`.seg[data-chart="${kind}"] button`).forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    $(ids.wrap).classList.toggle('hidden', mode !== 'donut');
+    $(ids.bars).classList.toggle('hidden', mode !== 'bars');
+    if (mode === 'donut') drawDonut(ids.canvas, ids.legend, slices, ids.k, selected);
+    else { if (ui.donuts[ids.canvas]) ui.donuts[ids.canvas].prev = {}; renderSimpleBars(ids.bars, slices, selected, ids.attr); }
+  }
+  function renderSimpleBars(id, slices, selected, attr) {
+    const box = $(id);
+    const total = slices.reduce((a, x) => a + x.value, 0);
+    if (!total) { box.innerHTML = '<p class="agenda-empty">Sin datos con estos filtros.</p>'; return; }
+    const emp = box.querySelector('.agenda-empty');
+    if (emp) emp.remove();
+    const max = Math.max(1, ...slices.map(x => x.value));
+    const existing = new Map([...box.querySelectorAll('.hb-row')].map(el => [el.dataset.k, el]));
+    slices.forEach(sl => {
+      let el = existing.get(sl.key);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'hb-row';
+        el.dataset.k = sl.key;
+        el.setAttribute('data-' + attr, sl.key);
+        el.innerHTML = '<span class="hb-name"></span><div class="hb-track"><div class="hb-fill"></div></div><span class="hb-val"></span>';
+      }
+      existing.delete(sl.key);
+      box.appendChild(el);
+      el.querySelector('.hb-name').textContent = sl.label;
+      el.querySelector('.hb-name').title = sl.label;
+      el.classList.toggle('selected', !!selected && selected === sl.key);
+      el.classList.toggle('faded', !!selected && selected !== sl.key);
+      el.querySelector('.hb-val').innerHTML = `${sl.value} <small>${Math.round((sl.value / total) * 100)}%</small>`;
+      const fill = el.querySelector('.hb-fill');
+      fill.style.background = sl.color;
+      void el.offsetWidth;
+      fill.style.width = `${(sl.value / max) * 100}%`;
+    });
+    existing.forEach(el => el.remove());
   }
 
   // Barras que crecen o se encogen con animación (se reutilizan las filas)
@@ -789,7 +850,7 @@
     const list = applyFilters(data.gestiones, f).filter(g => {
       if (sinUb && (g.colonia || g.seccion)) return false;
       if (q) {
-        const hay = norm([g.id, '#' + g.id, g.solicitante, g.curp, g.telefono, g.responsable, g.colonia, g.seccion, g.municipio, g.dependencia, g.tipo, g.medio, g.fuente, g.descripcion, g.observaciones].join(' '));
+        const hay = norm([g.id, '#' + g.id, g.solicitante, g.curp, g.telefono, g.responsable, g.colonia, g.seccion, g.municipio, g.dependencia, g.area, g.tipo, g.medio, g.fuente, g.descripcion, g.observaciones].join(' '));
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -800,7 +861,7 @@
         <td class="folio">#${g.id}</td>
         <td>${esc(dash(g.solicitante))}${g.tipo ? `<br><span class="muted">${esc(g.tipo)}</span>` : ''}</td>
         <td>${esc(dash(g.responsable))}</td>
-        <td>${esc(dash(g.dependencia))}</td>
+        <td>${esc(dash(g.dependencia))}${g.area ? `<br><span class="muted">${esc(g.area)}</span>` : ''}</td>
         <td>${prioridadBadge(g.prioridad)}</td>
         <td>${esc(dash(g.colonia))}${g.seccion ? `<br><span class="muted">Secc. ${esc(g.seccion)}</span>` : ''}</td>
         <td data-estado-cell>${estadoCell(g)}</td>
@@ -851,6 +912,9 @@
     set('fColonia', src.colonia); set('fSeccion', src.seccion); set('fMunicipio', src.municipio); set('fTelefono', src.telefono);
     set('fTipo', src.tipo); set('fMonto', src.monto || ''); set('fDescripcion', src.descripcion);
     set('fPrimerContacto', src.primerContacto); set('fFechaLimite', src.fechaLimite); set('fObservaciones', src.observaciones);
+    set('fArea', src.area);
+    toggleArea('fDependencia', 'fAreaGroup');
+    showRespHint(findContacto(src.responsable), false);
     $('fFechaIngreso').value = src.fechaIngreso || today();
     $('fFechaAct').value = g ? fmtDate(g.fechaActualizacion) : 'Se asigna al guardar';
     checkCurp();
@@ -879,12 +943,13 @@
       tipo: v('fTipo'), monto: montoRaw === '' ? 0 : Math.max(0, parseFloat(montoRaw) || 0), descripcion: v('fDescripcion'),
       prioridad: $('fPrioridad').value, dependencia: $('fDependencia').value, fuente: $('fFuente').value,
       primerContacto: $('fPrimerContacto').value, estatus: $('fEstatus').value || 'capturado',
-      fechaLimite: $('fFechaLimite').value, observaciones: v('fObservaciones')
+      fechaLimite: $('fFechaLimite').value, observaciones: v('fObservaciones'),
+      area: isGob($('fDependencia').value) ? v('fArea') : ''
     };
     // Unifica cómo se escribe el responsable (mismo nombre que en el catálogo)
     const rn = responsablesMap().get(norm(form.responsable));
     if (rn) form.responsable = rn;
-    const llenos = ['responsable', 'solicitante', 'curp', 'colonia', 'seccion', 'telefono', 'medio', 'tipo', 'monto', 'descripcion', 'prioridad', 'dependencia', 'fuente', 'primerContacto', 'fechaLimite', 'observaciones'].some(k => form[k]);
+    const llenos = ['responsable', 'solicitante', 'curp', 'colonia', 'seccion', 'telefono', 'medio', 'tipo', 'monto', 'descripcion', 'prioridad', 'dependencia', 'fuente', 'primerContacto', 'fechaLimite', 'observaciones', 'area'].some(k => form[k]);
     if (!llenos && !ui.editingGestion) {
       const ok = await confirmBox('No llenaste ningún dato. ¿Guardar la gestión vacía de todos modos?', 'Guardar vacía');
       if (!ok) return;
@@ -898,6 +963,205 @@
     ui.editingGestion = null;
     refreshCurrent();
     toast(`Gestión #${id} guardada`);
+  }
+
+
+  // ================= Responsable ↔ Directorio =================
+  function findContacto(name) {
+    const k = norm(name);
+    return k ? (data.directorio || []).find(c => norm(c.nombre) === k) || null : null;
+  }
+  function ensureOption(sel, value) {
+    if (value && ![...sel.options].some(o => o.value === value)) {
+      const o = document.createElement('option');
+      o.value = value; o.textContent = value;
+      sel.appendChild(o);
+    }
+  }
+  function toggleArea(selId, groupId) {
+    $(groupId).classList.toggle('hidden', !isGob($(selId).value));
+  }
+  function showRespHint(c, filled) {
+    const h = $('respHint');
+    if (!c) { h.textContent = ''; return; }
+    const parts = [];
+    if (c.telefono) parts.push('📞 ' + c.telefono);
+    if (c.extension) parts.push('Ext. ' + c.extension);
+    if (filled && c.dependencia) parts.push('dependencia llenada automáticamente');
+    else if (c.dependencia) parts.push('Enlace de ' + c.dependencia);
+    h.textContent = parts.join(' · ');
+  }
+  // Al elegir un responsable del directorio se llena su dependencia (y área)
+  function applyResponsable(name) {
+    const c = findContacto(name);
+    if (c) {
+      $('fResponsable').value = c.nombre;
+      if (c.dependencia) {
+        ensureOption($('fDependencia'), c.dependencia);
+        $('fDependencia').value = c.dependencia;
+      }
+      toggleArea('fDependencia', 'fAreaGroup');
+      if (c.area && isGob(c.dependencia)) $('fArea').value = c.area;
+    }
+    showRespHint(c, !!(c && c.dependencia));
+  }
+  function responsableSuggestions() {
+    const out = [], seen = new Set();
+    (data.directorio || []).slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es')).forEach(c => {
+      if (!c.nombre || seen.has(norm(c.nombre))) return;
+      seen.add(norm(c.nombre));
+      out.push({ value: c.nombre, label: c.nombre, sub: [c.dependencia, c.area].filter(Boolean).join(' · ') || c.cargo || '' });
+    });
+    responsablesMap().forEach((v, k) => { if (!seen.has(k)) { seen.add(k); out.push({ value: v, label: v, sub: 'Nombre agregado a mano' }); } });
+    return out;
+  }
+
+  // ================= Directorio =================
+  function setupDirFilters() {
+    const deps = [...new Set([...(data.config.catalogos.dependencias || []), ...data.directorio.map(c => c.dependencia).filter(Boolean)])];
+    fillSelect($('dirDependencia'), deps, { all: 'Todas las dependencias' });
+  }
+  const telHref = t => 'tel:' + String(t || '').replace(/[^\d+]/g, '');
+  function waHref(t) {
+    let d = String(t || '').replace(/\D/g, '');
+    if (d.length === 10) d = '52' + d;
+    return d.length >= 12 ? 'https://wa.me/' + d : '';
+  }
+  function renderDirectorio() {
+    setupDirFilters();
+    const q = norm($('dirSearch').value);
+    const fd = $('dirDependencia').value;
+    const counts = {};
+    data.gestiones.forEach(g => {
+      const k = norm(g.responsable);
+      if (!k) return;
+      const c = counts[k] || (counts[k] = { total: 0, abiertas: 0 });
+      c.total++;
+      if (!CERRADOS.includes(g.estatus)) c.abiertas++;
+    });
+    const list = data.directorio.filter(c => {
+      if (fd && c.dependencia !== fd) return false;
+      if (q && !norm([c.titulo, c.nombre, c.cargo, c.dependencia, c.area, c.telefono, c.extension, c.correo, c.notas].join(' ')).includes(q)) return false;
+      return true;
+    }).sort((a, b) => (a.dependencia || '').localeCompare(b.dependencia || '', 'es') || (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+    $('dirBody').innerHTML = list.length ? list.map(c => {
+      const n = counts[norm(c.nombre)];
+      const wa = waHref(c.telefono);
+      return `<tr data-contacto="${c.id}">
+        <td><strong>${esc([c.titulo, c.nombre].filter(Boolean).join(' ') || '—')}</strong>${c.cargo || c.correo ? `<br><span class="muted">${esc([c.cargo, c.correo].filter(Boolean).join(' · '))}</span>` : ''}</td>
+        <td>${esc(dash(c.dependencia))}${c.area ? `<br><span class="muted">${esc(c.area)}</span>` : ''}</td>
+        <td>${c.telefono ? `<a class="tel-link" href="${esc(telHref(c.telefono))}">${esc(c.telefono)}</a>` : '—'}</td>
+        <td>${esc(dash(c.extension))}</td>
+        <td>${n ? `<button class="count-btn" data-dir-gestiones="${esc(norm(c.nombre))}">${n.total} · ${plural(n.abiertas, 'abierta')}</button>` : '<span class="muted">0</span>'}</td>
+        <td>${wa ? `<a class="btn btn-sm wa-btn" href="${esc(wa)}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : ''}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="6" class="empty">${data.directorio.length ? 'Ningún contacto coincide con la búsqueda.' : 'Aún no hay contactos. Toca “Importar Excel” para cargar la lista de enlaces o “Nuevo contacto” para agregar uno.'}</td></tr>`;
+    $('dirCount').textContent = `${list.length} de ${data.directorio.length} contactos`;
+  }
+
+  function openContactoModal(c = null) {
+    ui.editingContacto = c;
+    const src = c || {};
+    $('cModalTitle').textContent = c ? 'Editar contacto' : 'Nuevo contacto';
+    ['Titulo', 'Nombre', 'Cargo', 'Area', 'Telefono', 'Extension', 'Correo', 'Notas'].forEach(k => { $('c' + k).value = src[k.toLowerCase()] || ''; });
+    fillSelect($('cDependencia'), [...new Set([...(data.config.catalogos.dependencias || []), ...data.directorio.map(x => x.dependencia).filter(Boolean)])], { placeholder: 'Sin especificar', value: src.dependencia || '' });
+    toggleArea('cDependencia', 'cAreaGroup');
+    $('cDeleteBtn').classList.toggle('hidden', !c);
+    openModal('contactoModal');
+  }
+
+  async function saveContacto(e) {
+    e.preventDefault();
+    const v = id => $(id).value.trim();
+    const form = {
+      titulo: v('cTitulo'), nombre: v('cNombre'), cargo: v('cCargo'), dependencia: $('cDependencia').value,
+      area: isGob($('cDependencia').value) ? v('cArea') : '', telefono: v('cTelefono'), extension: v('cExtension'),
+      correo: v('cCorreo'), notas: v('cNotas')
+    };
+    if (!form.nombre) return toast('Escribe al menos el nombre del contacto.');
+    const dup = data.directorio.find(c => norm(c.nombre) === norm(form.nombre) && c !== ui.editingContacto);
+    if (dup) return toast('Ya existe un contacto con ese nombre.');
+    const old = ui.editingContacto;
+    if (old) {
+      // Si cambia el nombre, se actualiza también en sus gestiones
+      if (norm(old.nombre) !== norm(form.nombre)) data.gestiones.forEach(g => { if (norm(g.responsable) === norm(old.nombre)) g.responsable = form.nombre; });
+      Object.assign(old, form);
+    } else data.directorio.push(Object.assign({ id: data.config.nextContactoId++ }, form));
+    await persist();
+    closeModal('contactoModal');
+    ui.editingContacto = null;
+    refreshCurrent();
+    toast('Contacto guardado');
+  }
+
+  async function deleteContacto() {
+    const c = ui.editingContacto;
+    if (!c) return;
+    if (!(await confirmBox(`¿Eliminar a ${c.nombre} del directorio? Sus gestiones se conservan.`, 'Eliminar', true))) return;
+    data.directorio = data.directorio.filter(x => x !== c);
+    await persist();
+    closeModal('contactoModal');
+    ui.editingContacto = null;
+    refreshCurrent();
+    toast('Contacto eliminado');
+  }
+
+  function parseCsv(text) {
+    const rows = [];
+    let row = [], cur = '', q = false;
+    const sep = (text.split('\n')[0].match(/;/g) || []).length > (text.split('\n')[0].match(/,/g) || []).length ? ';' : ',';
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) { if (ch === '"' && text[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === sep) { row.push(cur.trim()); cur = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cur.trim()); rows.push(row); row = []; cur = ''; }
+      else cur += ch;
+    }
+    if (cur || row.length) { row.push(cur.trim()); rows.push(row); }
+    return rows;
+  }
+
+  const DIR_HEADERS = { titulo: ['titulo'], nombre: ['nombre', 'nombre completo', 'enlace', 'contacto', 'responsable'], cargo: ['cargo', 'puesto'], dependencia: ['dependencia'], area: ['area'], telefono: ['telefono', 'celular', 'tel', 'movil'], extension: ['extension', 'ext', 'ext.'], correo: ['correo', 'email', 'e-mail', 'correo electronico'], notas: ['notas', 'observaciones'] };
+  async function importDirectorio(file) {
+    if (!file) return;
+    try {
+      const rows = /\.csv$/i.test(file.name) ? parseCsv(await readFileText(file)) : await XLSX.read(file);
+      const hi = rows.findIndex(r => r.some(c => DIR_HEADERS.nombre.includes(norm(c))));
+      if (hi < 0) return toast('No encontré una columna “Nombre” en el archivo.', 4500);
+      const idx = {};
+      rows[hi].forEach((h, i) => { const n = norm(h); Object.entries(DIR_HEADERS).forEach(([k, al]) => { if (idx[k] === undefined && al.includes(n)) idx[k] = i; }); });
+      let added = 0, updated = 0;
+      rows.slice(hi + 1).forEach(r => {
+        const get = k => idx[k] === undefined ? '' : String(r[idx[k]] || '').trim();
+        const nombre = get('nombre');
+        if (!nombre) return;
+        const item = { titulo: get('titulo'), nombre, cargo: get('cargo'), dependencia: matchDependencia(get('dependencia')), area: get('area'), telefono: get('telefono'), extension: get('extension'), correo: get('correo'), notas: get('notas') };
+        const ex = data.directorio.find(c => norm(c.nombre) === norm(nombre));
+        if (ex) { Object.keys(item).forEach(k => { if (item[k]) ex[k] = item[k]; }); updated++; }
+        else { data.directorio.push(Object.assign({ id: data.config.nextContactoId++ }, item)); added++; }
+      });
+      await persist();
+      refreshCurrent();
+      toast(`Directorio: ${added} contactos agregados, ${updated} actualizados.`, 4500);
+    } catch (err) {
+      console.error(err);
+      toast(err.message || 'No se pudo leer el archivo.', 4500);
+    }
+  }
+  // Une el nombre escrito con el de la lista oficial (sin acentos ni mayúsculas)
+  function matchDependencia(name) {
+    if (!name) return '';
+    const n = norm(name);
+    const cat = data.config.catalogos.dependencias || [];
+    return cat.find(d => norm(d) === n) || cat.find(d => norm(d).includes(n) || n.includes(norm(d))) || name;
+  }
+
+  async function exportDirectorio() {
+    if (!data.directorio.length) return toast('El directorio está vacío.');
+    const cols = [['Título', 8, 'titulo'], ['Nombre', 34, 'nombre'], ['Cargo', 14, 'cargo'], ['Dependencia', 52, 'dependencia'], ['Área', 20, 'area'], ['Teléfono', 16, 'telefono'], ['Extensión', 10, 'extension'], ['Correo', 26, 'correo'], ['Notas', 30, 'notas']];
+    const rows = data.directorio.slice().sort((a, b) => (a.dependencia || '').localeCompare(b.dependencia || '', 'es')).map(c => cols.map(x => c[x[2]] || ''));
+    await deliverFile(XLSX.build([{ name: 'Directorio', columns: cols.map(x => ({ header: x[0], width: x[1] })), rows }]), `directorio-${today()}.xlsx`);
   }
 
   // ================= Mapa =================
@@ -1158,7 +1422,7 @@
     $('rSummary').innerHTML = summaryTableHtml(rows, by, list.length);
     $('rDetailTitle').textContent = `Detalle: ${list.length} ${list.length === 1 ? 'gestión' : 'gestiones'} · ${money(monto)}`;
     $('rTableBody').innerHTML = list.length ? list.map(g => `<tr data-open-gestion="${g.id}" style="cursor:pointer">
-      <td class="folio">#${g.id}</td><td>${esc(dash(g.solicitante))}</td><td>${esc(dash(g.responsable))}</td><td>${esc(dash(g.dependencia))}</td>
+      <td class="folio">#${g.id}</td><td>${esc(dash(g.solicitante))}</td><td>${esc(dash(g.responsable))}</td><td>${esc(dash(g.dependencia))}${g.area ? `<br><span class="muted">${esc(g.area)}</span>` : ''}</td>
       <td>${prioridadBadge(g.prioridad)}</td><td>${esc(dash(g.colonia))}</td>
       <td><span class="badge st-${esc(g.estatus)}">${esc(ESTATUS_LABEL[g.estatus] || g.estatus)}</span>${isVencida(g) ? '<span class="badge badge-vencida">Vencida</span>' : ''}</td>
       <td class="nowrap">${fmtDate(g.fechaIngreso)}</td><td class="nowrap">${fmtDate(g.fechaLimite)}</td><td class="num">${g.monto ? money(g.monto) : '—'}</td></tr>`).join('')
@@ -1176,12 +1440,12 @@
           { header: 'CURP', width: 21 }, { header: 'Teléfono', width: 14 }, { header: 'Colonia domicilio', width: 22 }, { header: 'Sección', width: 9 },
           { header: 'Municipio', width: 15 }, { header: 'Medio de recepción', width: 24 }, { header: 'Fecha de ingreso', width: 15 },
           { header: 'Tipo de apoyo o petición', width: 24 }, { header: 'Detalle del problema', width: 50 }, { header: 'Monto estimado', width: 15, type: 'money' },
-          { header: 'Prioridad', width: 10 }, { header: 'Dependencia responsable', width: 40 }, { header: 'Fuente de ingreso', width: 24 },
+          { header: 'Prioridad', width: 10 }, { header: 'Dependencia responsable', width: 40 }, { header: 'Área (Gobierno del Estado)', width: 24 }, { header: 'Fuente de ingreso', width: 24 },
           { header: 'Primer contacto', width: 15 }, { header: 'Estado actual', width: 13 }, { header: 'Vencida', width: 9 }, { header: 'Fecha límite', width: 13 },
           { header: 'Última actualización', width: 18 }, { header: 'Observaciones', width: 50 }
         ],
         rows: list.map(g => [g.id, g.responsable, g.solicitante, g.curp, g.telefono, g.colonia, g.seccion, g.municipio, g.medio, fmtDate(g.fechaIngreso),
-          g.tipo, g.descripcion, Number(g.monto) || 0, PRIORIDAD_LABEL[g.prioridad] || '', g.dependencia, g.fuente,
+          g.tipo, g.descripcion, Number(g.monto) || 0, PRIORIDAD_LABEL[g.prioridad] || '', g.dependencia, g.area, g.fuente,
           g.primerContacto ? fmtDate(g.primerContacto) : '', ESTATUS_LABEL[g.estatus] || g.estatus, isVencida(g) ? 'Sí' : 'No',
           g.fechaLimite ? fmtDate(g.fechaLimite) : '', fmtDate(g.fechaActualizacion), g.observaciones])
       },
@@ -1207,7 +1471,7 @@
       <table>${summaryTableHtml(rows, by, list.length)}</table>
       <h2>Detalle</h2>
       <table><thead><tr><th>Folio</th><th>Solicitante</th><th>Responsable</th><th>Dependencia</th><th>Prioridad</th><th>Colonia</th><th>Estado</th><th>Ingreso</th><th>Límite</th><th class="num">Monto</th></tr></thead>
-      <tbody>${list.map(g => `<tr><td>#${g.id}</td><td>${esc(dash(g.solicitante))}</td><td>${esc(dash(g.responsable))}</td><td>${esc(dash(g.dependencia))}</td><td>${esc(PRIORIDAD_LABEL[g.prioridad] || '—')}</td><td>${esc(dash(g.colonia))}</td><td>${esc(ESTATUS_LABEL[g.estatus] || '')}${isVencida(g) ? ' (vencida)' : ''}</td><td>${fmtDate(g.fechaIngreso)}</td><td>${fmtDate(g.fechaLimite)}</td><td class="num">${g.monto ? money(g.monto) : '—'}</td></tr>`).join('')}</tbody></table>`;
+      <tbody>${list.map(g => `<tr><td>#${g.id}</td><td>${esc(dash(g.solicitante))}</td><td>${esc(dash(g.responsable))}</td><td>${esc(dash(g.dependencia))}${g.area ? ' · ' + esc(g.area) : ''}</td><td>${esc(PRIORIDAD_LABEL[g.prioridad] || '—')}</td><td>${esc(dash(g.colonia))}</td><td>${esc(ESTATUS_LABEL[g.estatus] || '')}${isVencida(g) ? ' (vencida)' : ''}</td><td>${fmtDate(g.fechaIngreso)}</td><td>${fmtDate(g.fechaLimite)}</td><td class="num">${g.monto ? money(g.monto) : '—'}</td></tr>`).join('')}</tbody></table>`;
     toast('En la vista de impresión, toca el botón Compartir para guardar como PDF.', 5000);
     setTimeout(() => window.print(), 300);
   }
@@ -1378,6 +1642,32 @@
     $('legendResp').addEventListener('click', e => { const li = e.target.closest('[data-resp]'); if (li && li.dataset.resp !== '__otros') toggleDash('dResponsable', li.dataset.resp); });
     $('respBars').addEventListener('click', e => { const r = e.target.closest('[data-resp]'); if (r) toggleDash('dResponsable', r.dataset.resp); });
     $('dViewList').addEventListener('click', () => goGestiones({}));
+    document.querySelectorAll('.seg[data-chart]').forEach(seg => seg.addEventListener('click', e => {
+      const b = e.target.closest('button[data-mode]');
+      if (b) setChartMode(seg.dataset.chart, b.dataset.mode);
+    }));
+    $('barsEstado').addEventListener('click', e => { const r = e.target.closest('[data-est]'); if (r) toggleDash('dEstatus', r.dataset.est); });
+    $('barsResp').addEventListener('click', e => { const r = e.target.closest('[data-resp]'); if (r && r.dataset.resp !== '__otros') toggleDash('dResponsable', r.dataset.resp); });
+
+    // Directorio
+    $('dirSearch').addEventListener('input', renderDirectorio);
+    $('dirDependencia').addEventListener('change', renderDirectorio);
+    $('dirBody').addEventListener('click', e => {
+      const gb = e.target.closest('[data-dir-gestiones]');
+      if (gb) { ui.carry = null; goGestiones({ responsable: gb.dataset.dirGestiones, estatus: '' }); return; }
+      if (e.target.closest('a, button')) return;
+      const tr = e.target.closest('tr[data-contacto]');
+      if (tr) openContactoModal(data.directorio.find(c => c.id === Number(tr.dataset.contacto)));
+    });
+    $('contactoForm').addEventListener('submit', saveContacto);
+    $('cDeleteBtn').addEventListener('click', deleteContacto);
+    $('cDependencia').addEventListener('change', () => toggleArea('cDependencia', 'cAreaGroup'));
+    $('dirImport').addEventListener('change', e => { importDirectorio(e.target.files[0]); e.target.value = ''; });
+    $('dirExport').addEventListener('click', exportDirectorio);
+
+    // Responsable con sugerencias del directorio
+    Combo.suggest($('fResponsable'), responsableSuggestions, { onPick: (it, text) => applyResponsable(it ? it.value : text) });
+    $('fDependencia').addEventListener('change', () => toggleArea('fDependencia', 'fAreaGroup'));
     D_IDS.forEach(id => $(id).addEventListener('change', renderDashboard));
     $('dClear').addEventListener('click', () => { D_IDS.forEach(id => { $(id).value = ''; }); renderDashboard(); });
     $('hotList').addEventListener('click', e => { const li = e.target.closest('li[data-colonia]'); if (li) goToMapColonia(li.dataset.colonia); });
@@ -1391,6 +1681,7 @@
         const act = a.dataset.action;
         if (act === 'new-gestion') openGestionModal();
         else if (act === 'new-evento') openEventoModal();
+        else if (act === 'new-contacto') openContactoModal();
         else if (act === 'go-backup') { switchSection('config'); $('backupPanel').scrollIntoView({ behavior: 'smooth' }); }
         else if (act === 'ver-sin-ubicacion') goGestiones({ sinUbicacion: true });
         else if (act === 'agenda-proximos') { ui.selectedDay = null; renderEventos(); }
@@ -1523,7 +1814,8 @@
   // ================= Inicio de la app =================
   function start() {
     applyPrefs();
-    ['fDependencia', 'gFilterDependencia', 'mDependencia', 'rDependencia', 'dDependencia'].forEach(id => Combo.enhance($(id)));
+    ['fDependencia', 'gFilterDependencia', 'mDependencia', 'rDependencia', 'dDependencia', 'cDependencia', 'dirDependencia',
+      'dResponsable', 'gFilterResponsable', 'mResponsable', 'rResponsable'].forEach(id => Combo.enhance($(id)));
     bind();
     if (!Vault.supported()) {
       showLock('unlockForm');

@@ -85,6 +85,7 @@
           <li data-section="gestiones"><span class="ico">📋</span> Gestiones</li>
           <li data-section="mapa"><span class="ico">🗺️</span> Mapa</li>
           <li data-section="eventos"><span class="ico">📅</span> Eventos</li>
+          <li data-section="directorio"><span class="ico">📇</span> Directorio</li>
           <li data-section="reportes"><span class="ico">📈</span> Reportes</li>
           <li data-section="config"><span class="ico">⚙️</span> Configuración</li>
         </ul>
@@ -108,9 +109,9 @@
       <section class="section active" id="dashboard">
         <div class="panel dash-filters">
           <div class="toolbar">
+            <select class="input" id="dEstatus" aria-label="Estado"></select>
             <label class="inline-label">Desde <input type="date" class="input" id="dDesde"></label>
             <label class="inline-label">Hasta <input type="date" class="input" id="dHasta"></label>
-            <select class="input" id="dEstatus" aria-label="Estado"></select>
             <select class="input" id="dResponsable" aria-label="Responsable"></select>
             <select class="input" id="dDependencia" aria-label="Dependencia"></select>
             <select class="input" id="dPrioridad" aria-label="Prioridad"></select>
@@ -123,14 +124,18 @@
         <div class="cards" id="taskCards"></div>
         <div class="grid-2">
           <div class="panel">
-            <h3 class="panel-title">Tareas por estado</h3>
+            <div class="panel-head"><h3 class="panel-title">Tareas por estado</h3>
+              <div class="seg" data-chart="estado"><button type="button" data-mode="donut">◯ Círculo</button><button type="button" data-mode="bars">▤ Barras</button></div></div>
             <p class="panel-hint">Toca una parte para filtrar todo el tablero.</p>
-            <div class="donut-wrap"><canvas id="donutEstado" class="donut"></canvas><ul class="donut-legend" id="legendEstado"></ul></div>
+            <div class="donut-wrap" id="wrapEstado"><canvas id="donutEstado" class="donut"></canvas><ul class="donut-legend" id="legendEstado"></ul></div>
+            <div class="hbars hidden" id="barsEstado"></div>
           </div>
           <div class="panel">
-            <h3 class="panel-title">Tareas por responsable</h3>
+            <div class="panel-head"><h3 class="panel-title">Tareas por responsable</h3>
+              <div class="seg" data-chart="resp"><button type="button" data-mode="donut">◯ Círculo</button><button type="button" data-mode="bars">▤ Barras</button></div></div>
             <p class="panel-hint">Toca una persona para filtrar todo el tablero.</p>
-            <div class="donut-wrap"><canvas id="donutResp" class="donut"></canvas><ul class="donut-legend" id="legendResp"></ul></div>
+            <div class="donut-wrap" id="wrapResp"><canvas id="donutResp" class="donut"></canvas><ul class="donut-legend" id="legendResp"></ul></div>
+            <div class="hbars hidden" id="barsResp"></div>
           </div>
         </div>
         <div class="panel">
@@ -223,6 +228,30 @@
             <h3 class="panel-title" id="dayTitle">Agenda</h3>
             <ul class="agenda-list" id="dayList"></ul>
           </div>
+        </div>
+      </section>
+
+      <!-- DIRECTORIO -->
+      <section class="section" id="directorio">
+        <div class="panel">
+          <div class="toolbar">
+            <input type="search" class="input" id="dirSearch" placeholder="Buscar por nombre, dependencia, teléfono…">
+            <select class="input" id="dirDependencia" aria-label="Dependencia"></select>
+            <button class="btn btn-primary" data-action="new-contacto">＋ Nuevo contacto</button>
+          </div>
+          <div class="actions" style="margin-bottom:12px">
+            <label class="btn btn-outline btn-sm file-btn">⬆ Importar Excel
+              <input type="file" id="dirImport" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv">
+            </label>
+            <button class="btn btn-outline btn-sm" id="dirExport">⬇ Exportar Excel</button>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Nombre</th><th>Dependencia</th><th>Teléfono</th><th>Ext.</th><th>Gestiones</th><th></th></tr></thead>
+              <tbody id="dirBody"></tbody>
+            </table>
+          </div>
+          <p class="table-foot" id="dirCount"></p>
         </div>
       </section>
 
@@ -380,7 +409,7 @@
         <button class="icon-btn" data-close aria-label="Cerrar">✕</button>
       </div>
       <form id="gestionForm" autocomplete="off">
-        <div class="form-group"><label for="fResponsable">Responsable</label><input class="input" id="fResponsable" list="responsablesList" placeholder="Persona de tu equipo que atiende"></div>
+        <div class="form-group"><label for="fResponsable">Responsable</label><input class="input" id="fResponsable" placeholder="Escribe para buscar en el directorio o pon un nombre nuevo"><small class="field-hint ok" id="respHint"></small></div>
         <fieldset>
           <legend>Datos del solicitante</legend>
           <div class="form-row">
@@ -413,6 +442,7 @@
             <div class="form-group"><label for="fDependencia">Dependencia responsable</label><select class="input" id="fDependencia"></select></div>
             <div class="form-group"><label for="fFuente">Fuente de ingreso</label><select class="input" id="fFuente"></select></div>
           </div>
+          <div class="form-group hidden" id="fAreaGroup"><label for="fArea">Área (Gobierno del Estado)</label><input class="input" id="fArea" list="areasList" placeholder="Escribe el área"></div>
         </fieldset>
         <fieldset>
           <legend>Seguimiento</legend>
@@ -472,6 +502,37 @@
     </div>
   </div>
 
+  <!-- Modal: contacto del directorio -->
+  <div class="modal" id="contactoModal" aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="cModalTitle">Nuevo contacto</h2>
+        <button class="icon-btn" data-close aria-label="Cerrar">✕</button>
+      </div>
+      <form id="contactoForm" autocomplete="off">
+        <div class="form-row three">
+          <div class="form-group"><label for="cTitulo">Título</label><input class="input" id="cTitulo" list="titulosList" placeholder="Lic., C., Ing.…"></div>
+          <div class="form-group"><label for="cNombre">Nombre completo</label><input class="input" id="cNombre" autocapitalize="words"></div>
+          <div class="form-group"><label for="cCargo">Cargo</label><input class="input" id="cCargo" placeholder="Enlace"></div>
+        </div>
+        <div class="form-group"><label for="cDependencia">Dependencia</label><select class="input" id="cDependencia"></select></div>
+        <div class="form-group hidden" id="cAreaGroup"><label for="cArea">Área (Gobierno del Estado)</label><input class="input" id="cArea" list="areasList"></div>
+        <div class="form-row three">
+          <div class="form-group"><label for="cTelefono">Teléfono</label><input class="input" id="cTelefono" type="tel"></div>
+          <div class="form-group"><label for="cExtension">Extensión</label><input class="input" id="cExtension" inputmode="numeric"></div>
+          <div class="form-group"><label for="cCorreo">Correo</label><input class="input" id="cCorreo" type="email" autocapitalize="none"></div>
+        </div>
+        <div class="form-group"><label for="cNotas">Notas</label><textarea class="input" id="cNotas" rows="2"></textarea></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger hidden" id="cDeleteBtn">🗑 Eliminar</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-outline" data-close>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar contacto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Confirmación -->
   <div class="modal" id="confirmModal" aria-hidden="true">
     <div class="modal-content modal-sm">
@@ -491,6 +552,8 @@
 
   <datalist id="coloniasList"></datalist>
   <datalist id="responsablesList"></datalist>
+  <datalist id="areasList"></datalist>
+  <datalist id="titulosList"><option value="Lic."><option value="C."><option value="Ing."><option value="Mtro."><option value="Mtra."><option value="Dr."><option value="Dra."><option value="Arq."><option value="Tec."></datalist>
   <datalist id="tiposList"></datalist>
   <datalist id="municipiosList"></datalist>
   <datalist id="seccionesList"></datalist>
