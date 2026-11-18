@@ -13,3 +13,9 @@ App personal instalable (PWA). Funciona sin internet y guarda todo cifrado en el
 3. Abrir la app desde el ícono y crear la contraseña.
 
 Hacer un respaldo desde **Configuración → Respaldo** al menos cada semana.
+
+## Datos de mapas incluidos
+
+- `data/secciones-chihuahua.geojson`: secciones electorales del municipio de Chihuahua (INE, marco distrital 2018), tomadas de https://github.com/emagar/mxDistritos.
+- `data/zonas-cp-chihuahua.geojson`: zonas por código postal del municipio (Correos de México / SEPOMEX), de https://github.com/open-mexico/mexico-geojson.
+- `data/colonias-chihuahua.json`: colonias del municipio con su código postal (catálogo de Correos de México), de https://github.com/Swumplurd/cp-mexico.

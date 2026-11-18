@@ -23,7 +23,7 @@
   ];
   const PALETTE = ['#2563eb', '#d97706', '#059669', '#db2777', '#7c3aed', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#be123c'];
   const GRAY = '#94a3b8';
-  const APP_VERSION = '9 · 18/11/2026';
+  const APP_VERSION = '10 · 18/11/2026';
   const DEFAULT_NAME = 'Gestor-S';
   const PREFS_KEY = 'panel.prefs';
   const LOCK_WHEN_HIDDEN_MS = 30 * 1000;
@@ -925,6 +925,7 @@
     set('fTipo', src.tipo); set('fMonto', src.monto || ''); set('fDescripcion', src.descripcion);
     set('fPrimerContacto', src.primerContacto); set('fFechaLimite', src.fechaLimite); set('fObservaciones', src.observaciones);
     set('fArea', src.area);
+    showColHint(src.colonia);
     toggleArea('fDependencia', 'fAreaGroup');
     showRespHint(findContacto(src.responsable), false);
     $('fFechaIngreso').value = src.fechaIngreso || today();
@@ -1017,6 +1018,21 @@
     }
     showRespHint(c, !!(c && c.dependencia));
   }
+  function showColHint(name) {
+    const h = $('colHint');
+    if (!name || !name.trim()) { h.textContent = ''; h.classList.add('ok'); return; }
+    const cp = cpDeColonia(name);
+    h.classList.toggle('ok', !!cp);
+    h.textContent = cp ? `📍 Se ubicará en el mapa en la zona CP ${cp}` : 'No está en el catálogo de colonias; podrás ubicarla en el mapa una sola vez.';
+  }
+  function coloniaSuggestions() {
+    const out = [], seen = new Set();
+    (coloniasCat || []).forEach(c => { if (!seen.has(c.k + c.cp)) { seen.add(c.k + c.cp); out.push({ value: c.n, label: c.n, sub: `CP ${c.cp} · ${c.t}` }); } });
+    const names = new Set((coloniasCat || []).map(c => c.k));
+    uniqueBy('colonia', MapaGeo.normColonia).forEach((v, k) => { if (!names.has(k)) out.push({ value: v, label: v, sub: 'Usada en tus gestiones' }); });
+    return out;
+  }
+
   function responsableSuggestions() {
     const out = [], seen = new Set();
     (data.directorio || []).slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es')).forEach(c => {
@@ -1248,16 +1264,49 @@
     const groups = {};
     const csm = view === 'seccion' ? colSecMap() : null;
     list.forEach(g => {
-      const key = view === 'seccion' ? seccionDe(g, csm).sec : MapaGeo.normColonia(g.colonia);
+      const key = view === 'seccion' ? seccionDe(g, csm).sec : view === 'zona' ? cpDeColonia(g.colonia) : MapaGeo.normColonia(g.colonia);
       if (!key) return;
-      const grp = groups[key] || (groups[key] = { key, label: view === 'seccion' ? 'Sección ' + key : g.colonia, total: 0, items: [] });
+      const grp = groups[key] || (groups[key] = { key, label: view === 'seccion' ? 'Sección ' + key : view === 'zona' ? 'Zona CP ' + key : g.colonia, total: 0, items: [] });
       grp.total++;
       grp.items.push(g);
     });
     return groups;
   }
   // Si no cargaste otra, se usa la cartografía de secciones incluida en la app (INE, municipio de Chihuahua)
-  const BUILTIN_CARTO = { seccion: 'data/secciones-chihuahua.geojson' };
+  const BUILTIN_CARTO = { seccion: 'data/secciones-chihuahua.geojson', zona: 'data/zonas-cp-chihuahua.geojson' };
+
+  // ---- Catálogo de colonias del municipio (Correos de México): colonia → código postal → zona del mapa ----
+  let coloniasCat = null;
+  async function loadColonias() {
+    if (coloniasCat) return coloniasCat;
+    try {
+      const arr = await (await fetch('data/colonias-chihuahua.json')).json();
+      coloniasCat = arr.map(c => Object.assign(c, { k: MapaGeo.normColonia(c.n) }));
+    } catch (e) { coloniasCat = []; }
+    return coloniasCat;
+  }
+  function cpDeColonia(name) {
+    const k = MapaGeo.normColonia(name);
+    if (!k) return '';
+    const manual = (data.config.colCp || {})[k];
+    if (manual && manual.cp) return manual.cp;
+    const cat = coloniasCat || [];
+    let m = cat.filter(c => c.k === k);
+    if (!m.length && k.length >= 4) m = cat.filter(c => c.k.startsWith(k + ' ') || c.k.endsWith(' ' + k));
+    if (!m.length && k.length >= 5) m = cat.filter(c => c.k.includes(k));
+    if (!m.length) return '';
+    const cnt = {};
+    m.forEach(c => { cnt[c.cp] = (cnt[c.cp] || 0) + 1; });
+    return Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0];
+  }
+  function coloniasDeCp(cp) { return (coloniasCat || []).filter(c => c.cp === cp).map(c => c.n); }
+  async function setColCp(colonia, cp) {
+    const k = MapaGeo.normColonia(colonia);
+    if (!k) return;
+    data.config.colCp = data.config.colCp || {};
+    data.config.colCp[k] = { colonia: colonia.trim(), cp: MapaGeo.normCp(cp) };
+    await persist();
+  }
   async function getCarto(view) {
     if (!(view in cartoCache)) {
       let geo = await MapaGeo.store.get(view);
@@ -1275,6 +1324,7 @@
     fillSelect($('mDependencia'), catalogOptions('dependencias', 'dependencia'), { all: 'Todas las dependencias' });
     fillSelect($('mMedio'), catalogOptions('medios', 'medio'), { all: 'Todos los medios' });
     fillSelect($('mFuente'), catalogOptions('fuentes', 'fuente'), { all: 'Todas las fuentes' });
+    await loadColonias();
     const view = $('mView').value;
     setFbarCount('mapa', Object.values(mapFilters()).filter(Boolean).length);
     const groups = mapGroups(view, applyFilters(data.gestiones, mapFilters()));
@@ -1284,13 +1334,16 @@
       if (ui.assignColonia) { // modo "ubicar colonia": el toque asigna la sección
         const col = ui.assignColonia;
         ui.assignColonia = null;
-        setColSec(col, key).then(() => { toast(`“${col}” quedó en la sección ${key}. Sus gestiones ya aparecen en el mapa.`, 4500); ui.mapSelected = key; renderMapa(); });
+        (view === 'zona' ? setColCp(col, key) : setColSec(col, key)).then(() => {
+          toast(`“${col}” quedó en la ${view === 'zona' ? 'zona CP' : 'sección'} ${key}. Sus gestiones ya aparecen en el mapa.`, 4500);
+          ui.mapSelected = key; renderMapa();
+        });
         return;
       }
       ui.mapSelected = key; showMapDetail(groups[key], view, key);
     };
     $('assignBanner').classList.toggle('hidden', !ui.assignColonia);
-    if (ui.assignColonia) $('assignText').textContent = `📍 Toca en el mapa la sección donde está la colonia “${ui.assignColonia}”.`;
+    if (ui.assignColonia) $('assignText').textContent = `📍 Toca en el mapa la ${view === 'zona' ? 'zona' : 'sección'} donde está la colonia “${ui.assignColonia}”.`;
     area.classList.toggle('assigning', !!ui.assignColonia);
     renderUnplaced(view);
     if (geo) {
@@ -1312,12 +1365,12 @@
   // Colonias cuyas gestiones no tienen sección y aún no se sabe dónde van
   function renderUnplaced(view) {
     const box = $('unplaced');
-    if (view !== 'seccion') { box.classList.add('hidden'); return; }
+    if (view !== 'seccion' && view !== 'zona') { box.classList.add('hidden'); return; }
     const csm = colSecMap();
     const pend = new Map();
     let sinNada = 0;
     applyFilters(data.gestiones, mapFilters()).forEach(g => {
-      if (seccionDe(g, csm).sec) return;
+      if (view === 'seccion' ? seccionDe(g, csm).sec : cpDeColonia(g.colonia)) return;
       const k = MapaGeo.normColonia(g.colonia);
       if (!k) { sinNada++; return; }
       const p = pend.get(k) || { label: g.colonia, n: 0 };
@@ -1327,10 +1380,10 @@
     if (!pend.size && !sinNada) { box.classList.add('hidden'); return; }
     const rows = [...pend.values()].sort((a, b) => b.n - a.n);
     box.innerHTML = `<h4>Gestiones que aún no aparecen en el mapa</h4>
-      <p class="muted">Indica una sola vez en qué sección está cada colonia: escribe el número o toca “Ubicar en el mapa”. Todas las gestiones de esa colonia (las de ahora y las futuras) aparecerán ahí.</p>
+      <p class="muted">${view === 'zona' ? 'Estas colonias no están en el catálogo de Correos de México (quizá están escritas distinto). Indica una sola vez su código postal o toca “Ubicar en el mapa”.' : 'Para verlas por sección, indica una sola vez en qué sección está cada colonia: escribe el número o toca “Ubicar en el mapa”. También puedes verlas sin hacer nada en la vista “Por zona de la colonia”.'}</p>
       ${rows.map(r => `<div class="unplaced-row"><span><strong>${esc(r.label)}</strong> <span class="muted">· ${plural(r.n, 'gestión').replace('gestións', 'gestiones')}</span></span>
         <button class="btn btn-outline btn-sm" data-ubicar="${esc(r.label)}">📍 Ubicar en el mapa</button>
-        <input class="input" inputmode="numeric" placeholder="Sección" data-colsec-input="${esc(r.label)}">
+        <input class="input" inputmode="numeric" placeholder="${view === 'zona' ? 'Código postal' : 'Sección'}" data-colsec-input="${esc(r.label)}">
         <button class="btn btn-primary btn-sm" data-colsec-save="${esc(r.label)}">Guardar</button></div>`).join('')}
       ${sinNada ? `<p class="muted" style="margin-top:8px">${plural(sinNada, 'gestión').replace('gestións', 'gestiones')} sin colonia ni sección.</p>` : ''}`;
     box.classList.remove('hidden');
@@ -1345,7 +1398,8 @@
   function showMapDetail(grp, view, key) {
     const box = $('mapDetail');
     if (!grp) {
-      box.innerHTML = `<h4>${view === 'seccion' ? 'Sección ' + esc(key) : 'Zona seleccionada'}</h4><p class="muted">Sin gestiones con estos filtros.</p>`;
+      const cols = view === 'zona' ? coloniasDeCp(key) : [];
+      box.innerHTML = `<h4>${view === 'seccion' ? 'Sección ' + esc(key) : view === 'zona' ? 'Zona CP ' + esc(key) : 'Zona seleccionada'}</h4><p class="muted">Sin gestiones con estos filtros.</p>${cols.length ? `<h5>Colonias de esta zona</h5><p class="muted">${esc(cols.join(', '))}</p>` : ''}`;
       return;
     }
     const venc = grp.items.filter(isVencida).length;
@@ -1354,21 +1408,25 @@
       <div class="stat"><span>Gestiones</span><strong>${grp.total}</strong></div>
       <div class="stat"><span>Vencidas</span><strong>${venc}</strong></div>
       <div class="stat"><span>Monto estimado</span><strong>${money(grp.items.reduce((s, g) => s + (Number(g.monto) || 0), 0))}</strong></div>
+      ${view === 'zona' ? `<h5>Por colonia</h5>${(() => { const lb = {}; grp.items.forEach(g => { const k = MapaGeo.normColonia(g.colonia); if (!lb[k]) lb[k] = g.colonia; }); return countBy(grp.items, g => lb[MapaGeo.normColonia(g.colonia)]); })()}` : ''}
       <h5>Por estado</h5>${countBy(grp.items, g => ESTATUS_LABEL[g.estatus])}
       <h5>Por responsable</h5>${countBy(grp.items, g => g.responsable || 'Sin asignar')}
       <h5>Por dependencia</h5>${countBy(grp.items, g => g.dependencia)}
       <h5>Por medio de recepción</h5>${countBy(grp.items, g => g.medio)}
+      ${view === 'zona' && coloniasDeCp(key).length ? `<h5>Colonias de esta zona</h5><p class="muted">${esc(coloniasDeCp(key).join(', '))}</p>` : ''}
       <h5>Gestiones</h5>
       <ul class="mini-list">${grp.items.sort((a, b) => b.id - a.id).map(g => `<li data-open-gestion="${g.id}"><strong>#${g.id}</strong> ${esc(dash(g.solicitante))}${view === 'seccion' && !g.seccion && g.colonia ? ` <span class="via-col">(por colonia ${esc(g.colonia)})</span>` : ''}<br><span class="muted">${esc(ESTATUS_LABEL[g.estatus] || '')}${isVencida(g) ? ' · Vencida' : ''}${g.responsable ? ' · ' + esc(g.responsable) : ''}</span></li>`).join('')}</ul>
       <div class="actions" style="margin-top:12px">
-        ${view === 'colonia' ? `<button class="btn btn-outline btn-sm" data-report-colonia="${esc(key)}">Ver reporte</button>
+        ${view === 'colonia' || view === 'zona' ? `<button class="btn btn-outline btn-sm" data-report-colonia="${esc(view === 'zona' ? MapaGeo.normColonia(grp.items[0].colonia) : key)}">Ver reporte</button>
         <button class="btn btn-outline btn-sm" data-event-colonia="${esc(grp.label)}">Agendar evento aquí</button>` : ''}
       </div>`;
   }
 
   function goToMapColonia(key) {
-    $('mView').value = 'colonia';
-    ui.mapSelected = key;
+    const g = data.gestiones.find(x => MapaGeo.normColonia(x.colonia) === key);
+    const cp = g ? cpDeColonia(g.colonia) : '';
+    $('mView').value = cp ? 'zona' : 'colonia';
+    ui.mapSelected = cp || key;
     switchSection('mapa');
   }
 
@@ -1613,7 +1671,8 @@
     const nManual = Object.keys(data.config.colSec || {}).length, nTotal = Object.keys(colSecMap()).length;
     $('cfgColSecStatus').textContent = nTotal ? `${nTotal} colonias ligadas a una sección (${nManual} indicadas por ti, ${nTotal - nManual} aprendidas de tus gestiones).` : 'Aún no hay colonias ligadas a secciones.';
     const [sec, col] = await Promise.all([getCarto('seccion'), getCarto('colonia')]);
-    $('cfgCartoStatus').textContent = `${sec ? `Secciones: ${sec.features.length} zonas${sec._builtin ? ' (incluidas en la app: municipio de Chihuahua, INE)' : ' cargadas'}.` : 'Secciones: sin cargar.'} ${col ? `Colonias: ${col.features.length} zonas cargadas.` : 'Colonias: sin cargar.'}`;
+    const zon = await getCarto('zona');
+    $('cfgCartoStatus').textContent = `${sec ? `Secciones: ${sec.features.length}${sec._builtin ? ' (incluidas: municipio de Chihuahua, INE)' : ' cargadas'}.` : 'Secciones: sin cargar.'} ${zon ? `Zonas por código postal: ${zon.features.length}${zon._builtin ? ' (incluidas: Correos de México)' : ''}, con ${(coloniasCat || []).length} colonias.` : ''} ${col ? `Colonias: ${col.features.length} zonas cargadas.` : ''}`;
   }
 
   async function renderBioStatus() {
@@ -1779,10 +1838,11 @@
       if (sv) {
         const col = sv.dataset.colsecSave;
         const inp = [...document.querySelectorAll('[data-colsec-input]')].find(i => i.dataset.colsecInput === col);
-        const sec = MapaGeo.normSeccion(inp && inp.value);
-        if (!sec) return toast('Escribe el número de sección.');
-        await setColSec(col, sec);
-        toast(`“${col}” quedó en la sección ${sec}.`);
+        const zona = $('mView').value === 'zona';
+        const sec = zona ? MapaGeo.normCp(inp && inp.value) : MapaGeo.normSeccion(inp && inp.value);
+        if (!sec) return toast(zona ? 'Escribe el código postal.' : 'Escribe el número de sección.');
+        if (zona) await setColCp(col, sec); else await setColSec(col, sec);
+        toast(`“${col}” quedó en la ${zona ? 'zona CP' : 'sección'} ${sec}.`);
         renderMapa();
       }
     });
@@ -1864,14 +1924,18 @@
     });
     $('gestionForm').addEventListener('submit', saveGestion);
     $('fCurp').addEventListener('input', checkCurp);
-    // Si la colonia ya tiene gestiones con sección, se sugiere esa sección
-    $('fColonia').addEventListener('change', () => {
+    // Colonia: sugerencias del catálogo; muestra su zona y sugiere sección si se conoce
+    const coloniaElegida = () => {
+      const name = $('fColonia').value;
+      showColHint(name);
       if ($('fSeccion').value.trim()) return;
-      const k = MapaGeo.normColonia($('fColonia').value);
+      const k = MapaGeo.normColonia(name);
       if (!k) return;
       const sec = colSecMap()[k];
       if (sec) { $('fSeccion').value = sec; toast(`Sección ${sec} según la colonia (puedes cambiarla).`); }
-    });
+    };
+    Combo.suggest($('fColonia'), coloniaSuggestions, { onPick: (it, text) => { if (it) $('fColonia').value = it.value; coloniaElegida(); } });
+    $('fColonia').addEventListener('change', coloniaElegida);
     $('gDeleteBtn').addEventListener('click', () => { if (ui.editingGestion) deleteGestion(ui.editingGestion.id); });
     $('gScheduleBtn').addEventListener('click', () => {
       const g = ui.editingGestion;
@@ -1967,6 +2031,7 @@
       'dResponsable', 'gFilterResponsable', 'mResponsable', 'rResponsable'].forEach(id => Combo.enhance($(id)));
     setupCollapsibles();
     bind();
+    loadColonias();
     if (!Vault.supported()) {
       showLock('unlockForm');
       $('unlockForm').classList.add('hidden');

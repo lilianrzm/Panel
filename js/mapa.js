@@ -55,8 +55,14 @@ const MapaGeo = (() => {
   const SECCION_PROPS = ['SECCION', 'seccion', 'Seccion', 'CVE_SECC', 'SECC', 'secc', 'ID_SECCION'];
   const COLONIA_PROPS = ['COLONIA', 'colonia', 'Colonia', 'NOMBRE', 'nombre', 'Nombre', 'NOM_COL', 'NOM_ASEN', 'name', 'NAME'];
 
+  const ZONA_PROPS = ['CP', 'd_codigo', 'cp', 'CODIGO', 'codigo_postal'];
+  const normCp = v => { const d = String(v || '').replace(/\D/g, ''); return d ? d.padStart(5, '0') : ''; };
   function featureKey(feature, view) {
     const p = feature.properties || {};
+    if (view === 'zona') {
+      for (const k of ZONA_PROPS) if (p[k] !== undefined && p[k] !== null && p[k] !== '') return { key: normCp(p[k]), label: 'CP ' + normCp(p[k]) };
+      return { key: '', label: '' };
+    }
     const props = view === 'seccion' ? SECCION_PROPS : COLONIA_PROPS;
     for (const k of props) {
       if (p[k] !== undefined && p[k] !== null && p[k] !== '') {
@@ -184,7 +190,7 @@ const MapaGeo = (() => {
       path.dataset.key = key;
       if (opts.selected && opts.selected === key) path.classList.add('selected');
       const title = document.createElementNS(NS, 'title');
-      title.textContent = `${view === 'seccion' ? 'Sección ' : ''}${label}: ${c ? c.total : 0} gestiones`;
+      title.textContent = `${view === 'seccion' ? 'Sección ' : view === 'zona' ? 'Zona ' : ''}${label}: ${c ? c.total : 0} gestiones`;
       path.appendChild(title);
       g.appendChild(path);
       if (c) s._t = t;
@@ -204,7 +210,7 @@ const MapaGeo = (() => {
       circ.setAttribute('class', 'heat-dot');
       circ.dataset.key = key;
       const title = document.createElementNS(NS, 'title');
-      title.textContent = `${view === 'seccion' ? 'Sección ' : ''}${label}: ${c.total} gestiones`;
+      title.textContent = `${view === 'seccion' ? 'Sección ' : view === 'zona' ? 'Zona ' : ''}${label}: ${c.total} gestiones`;
       circ.appendChild(title);
       gb.appendChild(circ);
       const rpx = 7 + 13 * Math.sqrt(t);
@@ -315,5 +321,5 @@ const MapaGeo = (() => {
     }));
   }
 
-  return { store, heatColor, normColonia, normSeccion, validateGeo, renderChoropleth, renderGrid };
+  return { store, heatColor, normColonia, normSeccion, normCp, validateGeo, renderChoropleth, renderGrid };
 })();

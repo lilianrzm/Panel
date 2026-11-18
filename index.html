@@ -195,8 +195,9 @@
         <div class="panel">
           <div class="toolbar" data-collapsible="mapa" data-title="Filtros del mapa">
             <select class="input" id="mView">
-              <option value="seccion">Vista por sección</option>
-              <option value="colonia">Vista por colonia</option>
+              <option value="zona">Por zona de la colonia (automático)</option>
+              <option value="seccion">Por sección electoral</option>
+              <option value="colonia">Lista de colonias</option>
             </select>
             <select class="input" id="mEstatus"></select>
             <select class="input" id="mResponsable"></select>
@@ -438,7 +439,7 @@
             <div class="form-group"><label for="fCurp">CURP</label><input class="input" id="fCurp" maxlength="18" autocapitalize="characters" spellcheck="false"><small class="field-hint" id="curpHint"></small></div>
           </div>
           <div class="form-row three">
-            <div class="form-group"><label for="fColonia">Colonia domicilio</label><input class="input" id="fColonia" list="coloniasList"></div>
+            <div class="form-group"><label for="fColonia">Colonia domicilio</label><input class="input" id="fColonia" placeholder="Escribe para buscar"><small class="field-hint ok" id="colHint"></small></div>
             <div class="form-group"><label for="fSeccion">Sección</label><input class="input" id="fSeccion" inputmode="numeric" list="seccionesList"></div>
             <div class="form-group"><label for="fMunicipio">Municipio</label><input class="input" id="fMunicipio" list="municipiosList"></div>
           </div>
