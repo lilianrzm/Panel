@@ -434,14 +434,20 @@
     return arr;
   }
 
-  const D_IDS = ['dDesde', 'dHasta', 'dResponsable', 'dDependencia', 'dPrioridad', 'dMedio', 'dFuente', 'dColonia'];
+  const D_IDS = ['dDesde', 'dHasta', 'dEstatus', 'dResponsable', 'dDependencia', 'dPrioridad', 'dMedio', 'dFuente', 'dColonia'];
+  const REDUCED = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  const ANIM_MS = 650;
+
   function dashFilters() {
     return {
-      desde: $('dDesde').value, hasta: $('dHasta').value, responsable: $('dResponsable').value, dependencia: $('dDependencia').value,
-      prioridad: $('dPrioridad').value, medio: $('dMedio').value, fuente: $('dFuente').value, colonia: $('dColonia').value
+      desde: $('dDesde').value, hasta: $('dHasta').value, estatus: $('dEstatus').value, responsable: $('dResponsable').value,
+      dependencia: $('dDependencia').value, prioridad: $('dPrioridad').value, medio: $('dMedio').value, fuente: $('dFuente').value,
+      colonia: $('dColonia').value
     };
   }
   function setupDashFilters() {
+    fillSelect($('dEstatus'), ESTATUS, { all: 'Todos los estados', extraFirst: ESTADO_FILTER_EXTRA });
     fillSelect($('dResponsable'), respOptions(), { all: 'Todos los responsables' });
     fillSelect($('dDependencia'), catalogOptions('dependencias', 'dependencia'), { all: 'Todas las dependencias' });
     fillSelect($('dPrioridad'), PRIORIDADES, { all: 'Todas las prioridades' });
@@ -451,54 +457,74 @@
     fillSelect($('dColonia'), col, { all: 'Todas las colonias' });
   }
 
+  // Cambia un filtro del Inicio desde las gráficas (tocar otra vez lo quita)
+  function toggleDash(id, value) {
+    $(id).value = $(id).value === value ? '' : value;
+    renderDashboard();
+  }
+
+  function animateNumber(el, to) {
+    const from = Number(el.dataset.v || 0);
+    el.dataset.v = to;
+    if (REDUCED || from === to) { el.textContent = to; return; }
+    const t0 = performance.now();
+    const step = now => {
+      if (Number(el.dataset.v) !== to) return;
+      const t = Math.min(1, (now - t0) / ANIM_MS);
+      el.textContent = Math.round(from + (to - from) * ease(t));
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
   function renderDashboard() {
     setupDashFilters();
     const df = dashFilters();
     const L = applyFilters(data.gestiones, df);
+    // Cada gráfica ignora su propio filtro para poder resaltar la parte elegida
+    const Lc = applyFilters(data.gestiones, Object.assign({}, df, { estatus: df.estatus === 'vencidas' ? 'vencidas' : '' }));
+    const Lr = applyFilters(data.gestiones, Object.assign({}, df, { responsable: '' }));
     const activos = Object.values(df).filter(Boolean).length;
     $('dClear').classList.toggle('hidden', !activos);
     $('dSummary').textContent = activos
-      ? `Mostrando ${L.length} de ${data.gestiones.length} gestiones con ${activos === 1 ? '1 filtro' : activos + ' filtros'}.`
-      : `Mostrando todas las gestiones (${data.gestiones.length}). Usa los filtros para ver solo una parte.`;
-    const abiertas = L.filter(g => !CERRADOS.includes(g.estatus)).length;
-    const venc = L.filter(isVencida).length;
-    const curso = L.filter(g => g.estatus === 'curso').length;
-    const det = L.filter(g => g.estatus === 'detenido').length;
+      ? `Mostrando ${L.length} de ${data.gestiones.length} gestiones con ${activos === 1 ? '1 filtro' : activos + ' filtros'}. Toca otra vez una parte de la gráfica para quitar su filtro.`
+      : `Mostrando todas las gestiones (${data.gestiones.length}). Filtra aquí arriba o toca cualquier parte de las gráficas.`;
+
+    // Tarjetas
+    const Lk = applyFilters(data.gestiones, Object.assign({}, df, { estatus: '' }));
     const cards = [
-      { key: '', label: 'Total de gestiones', n: L.length, sub: plural(abiertas, 'abierta'), c: 'var(--primary)' },
-      { key: 'vencidas', label: 'Tareas vencidas', n: venc, sub: 'Pasaron su fecha límite', c: 'var(--st-vencida)' },
-      { key: 'curso', label: 'En curso', n: curso, sub: plural(L.filter(g => g.estatus === 'curso' && isVencida(g)).length, 'vencida'), c: 'var(--st-curso)' },
-      { key: 'detenido', label: 'Detenido', n: det, sub: plural(L.filter(g => g.estatus === 'detenido' && isVencida(g)).length, 'vencida'), c: 'var(--st-detenido)' }
+      { key: '', label: 'Total de gestiones', n: Lk.length, sub: plural(Lk.filter(g => !CERRADOS.includes(g.estatus)).length, 'abierta'), c: 'var(--primary)' },
+      { key: 'vencidas', label: 'Tareas vencidas', n: Lk.filter(isVencida).length, sub: 'Pasaron su fecha límite', c: 'var(--st-vencida)' },
+      { key: 'curso', label: 'En curso', n: Lk.filter(g => g.estatus === 'curso').length, sub: plural(Lk.filter(g => g.estatus === 'curso' && isVencida(g)).length, 'vencida'), c: 'var(--st-curso)' },
+      { key: 'detenido', label: 'Detenido', n: Lk.filter(g => g.estatus === 'detenido').length, sub: plural(Lk.filter(g => g.estatus === 'detenido' && isVencida(g)).length, 'vencida'), c: 'var(--st-detenido)' }
     ];
-    $('taskCards').innerHTML = cards.map(c => `
-      <div class="card" style="--c:${c.c}" data-card="${c.key}">
-        <div class="card-number">${c.n}</div><div class="card-title">${c.label}</div><div class="card-sub">${c.sub}</div>
-      </div>`).join('');
+    const box = $('taskCards');
+    if (!box.children.length) {
+      box.innerHTML = cards.map(c => `<div class="card" style="--c:${c.c}" data-card="${c.key}"><div class="card-number" data-v="0">0</div><div class="card-title">${c.label}</div><div class="card-sub"></div></div>`).join('');
+    }
+    cards.forEach(c => {
+      const el = box.querySelector(`[data-card="${c.key}"]`);
+      animateNumber(el.querySelector('.card-number'), c.n);
+      el.querySelector('.card-sub').textContent = c.sub;
+      el.classList.toggle('selected', !!df.estatus && df.estatus === c.key);
+    });
 
     // Dona por estado
-    const estSlices = ESTATUS.map(e => ({ key: e.id, label: e.label, value: L.filter(g => g.estatus === e.id).length, color: estColor(e.id) }));
-    drawDonut('donutEstado', 'legendEstado', estSlices, 'estado');
+    const estSlices = ESTATUS.map(e => ({ key: e.id, label: e.label, value: Lc.filter(g => g.estatus === e.id).length, color: estColor(e.id) }));
+    drawDonut('donutEstado', 'legendEstado', estSlices, 'estado', df.estatus !== 'vencidas' ? df.estatus : '');
 
     // Dona y barras por responsable
-    const rg = respGroups(L);
+    const rg = respGroups(Lr);
     const top = rg.filter(r => r.key !== '~').slice(0, 9);
     const rest = rg.filter(r => r.key !== '~').slice(9);
     const sin = rg.find(r => r.key === '~');
     const respSlices = top.map(r => ({ key: r.key, label: r.label, value: r.total, color: r.color }));
     if (rest.length) respSlices.push({ key: '__otros', label: `Otros (${rest.length})`, value: rest.reduce((s, r) => s + r.total, 0), color: '#cbd5e1' });
     if (sin) respSlices.push({ key: '~', label: 'Sin asignar', value: sin.total, color: GRAY });
-    drawDonut('donutResp', 'legendResp', respSlices, 'responsable');
+    drawDonut('donutResp', 'legendResp', respSlices, 'responsable', df.responsable);
 
     $('barLegend').innerHTML = ESTATUS.map(e => `<span><i style="background:${estColor(e.id)}"></i>${e.label}</span>`).join('');
-    const maxT = Math.max(1, ...rg.map(r => r.total));
-    $('respBars').innerHTML = rg.length ? rg.map(r => `
-      <div class="bar-row" data-resp="${esc(r.key)}">
-        <span class="bar-name" title="${esc(r.label)}">${esc(r.label)}</span>
-        <div class="bar-track" style="width:${Math.max(8, (r.total / maxT) * 100)}%">
-          ${ESTATUS.filter(e => r.est[e.id]).map(e => `<div style="width:${(r.est[e.id] / r.total) * 100}%;background:${estColor(e.id)}" title="${e.label}: ${r.est[e.id]}"></div>`).join('')}
-        </div>
-        <span class="bar-total">${r.total}${r.vencidas ? `<small>${r.vencidas} vencida${r.vencidas > 1 ? 's' : ''}</small>` : ''}</span>
-      </div>`).join('') : '<p class="agenda-empty">Aún no hay gestiones.</p>';
+    renderRespBars(respGroups(applyFilters(data.gestiones, Object.assign({}, df, { responsable: '' }))), df.responsable);
 
     // Zonas con más gestiones
     const zonas = new Map();
@@ -509,12 +535,7 @@
       z.count++;
       zonas.set(k, z);
     });
-    const zt = [...zonas.values()].sort((a, b) => b.count - a.count).slice(0, 8);
-    const zmax = zt.length ? zt[0].count : 1;
-    $('hotList').innerHTML = zt.length ? zt.map(z => `
-      <li data-colonia="${esc(z.key)}"><span class="dot"></span>
-        <span class="hot-name">${esc(z.label)}<div class="hot-bar" style="width:${Math.max(6, (z.count / zmax) * 100)}%"></div></span>
-        <span class="hot-count">${z.count}</span></li>`).join('') : '<li class="agenda-empty" style="cursor:default">Aún no hay gestiones con colonia.</li>';
+    renderHotList([...zonas.values()].sort((a, b) => b.count - a.count).slice(0, 8));
 
     const hoy = today();
     const proximos = data.eventos.filter(ev => ev.fecha && ev.fecha >= hoy)
@@ -529,46 +550,145 @@
     } else n.classList.add('hidden');
   }
 
-  function drawDonut(canvasId, legendId, slices, kind) {
+  // Barras que crecen o se encogen con animación (se reutilizan las filas)
+  function renderRespBars(rg, selected) {
+    const box = $('respBars');
+    const empty = box.querySelector('.agenda-empty');
+    if (!rg.length) { box.innerHTML = '<p class="agenda-empty">Sin gestiones con estos filtros.</p>'; return; }
+    if (empty) empty.remove();
+    const maxT = Math.max(1, ...rg.map(r => r.total));
+    const existing = new Map([...box.querySelectorAll('.bar-row')].map(el => [el.dataset.resp, el]));
+    rg.forEach(r => {
+      let el = existing.get(r.key);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'bar-row';
+        el.dataset.resp = r.key;
+        el.innerHTML = `<span class="bar-name"></span><div class="bar-track" style="width:0%">${ESTATUS.map(e => `<div data-e="${e.id}" style="width:0%"></div>`).join('')}</div><span class="bar-total"></span>`;
+      }
+      existing.delete(r.key);
+      box.appendChild(el);
+      const nm = el.querySelector('.bar-name');
+      nm.textContent = r.label; nm.title = r.label;
+      el.classList.toggle('selected', selected === r.key);
+      el.classList.toggle('faded', !!selected && selected !== r.key);
+      el.querySelector('.bar-total').innerHTML = `${r.total}${r.vencidas ? `<small>${plural(r.vencidas, 'vencida')}</small>` : ''}`;
+      void el.offsetWidth; // para que la transición arranque desde el valor anterior
+      el.querySelector('.bar-track').style.width = `${Math.max(8, (r.total / maxT) * 100)}%`;
+      ESTATUS.forEach(e => {
+        const seg = el.querySelector(`[data-e="${e.id}"]`);
+        seg.style.background = estColor(e.id);
+        seg.style.width = `${((r.est[e.id] || 0) / r.total) * 100}%`;
+        seg.title = `${e.label}: ${r.est[e.id] || 0}`;
+      });
+    });
+    existing.forEach(el => el.remove());
+  }
+
+  function renderHotList(zt) {
+    const box = $('hotList');
+    if (!zt.length) { box.innerHTML = '<li class="agenda-empty" style="cursor:default">Sin gestiones con colonia para estos filtros.</li>'; return; }
+    const empty = box.querySelector('.agenda-empty');
+    if (empty) empty.remove();
+    const zmax = zt[0].count;
+    const existing = new Map([...box.querySelectorAll('li[data-colonia]')].map(el => [el.dataset.colonia, el]));
+    zt.forEach(z => {
+      let el = existing.get(z.key);
+      if (!el) {
+        el = document.createElement('li');
+        el.dataset.colonia = z.key;
+        el.innerHTML = '<span class="dot"></span><span class="hot-name"><span class="hot-label"></span><div class="hot-bar" style="width:0%"></div></span><span class="hot-count" data-v="0">0</span>';
+      }
+      existing.delete(z.key);
+      box.appendChild(el);
+      el.querySelector('.hot-label').textContent = z.label;
+      void el.offsetWidth;
+      el.querySelector('.hot-bar').style.width = `${Math.max(6, (z.count / zmax) * 100)}%`;
+      animateNumber(el.querySelector('.hot-count'), z.count);
+    });
+    existing.forEach(el => el.remove());
+  }
+
+  // Dona animada: las partes giran y cambian de tamaño hacia los nuevos valores
+  function drawDonut(canvasId, legendId, slices, kind, selected) {
+    const st = ui.donuts[canvasId] || (ui.donuts[canvasId] = { prev: {}, colors: {}, token: 0 });
+    const from = st.prev;
+    const target = {};
+    slices.forEach(s => { target[s.key] = s.value; st.colors[s.key] = s.color; });
+    const all = [...slices];
+    Object.keys(from).forEach(k => { if (!(k in target) && from[k]) all.push({ key: k, value: 0, color: st.colors[k] || GRAY }); });
+    st.prev = target;
+    const token = ++st.token;
+
     const canvas = $(canvasId);
     const dpr = window.devicePixelRatio || 1;
     const size = canvas.clientWidth || 210;
     canvas.width = size * dpr; canvas.height = size * dpr;
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, size, size);
-    const total = slices.reduce((s, x) => s + x.value, 0);
-    const cx = size / 2, cy = size / 2, R = size / 2 - 4, r = R * 0.6;
-    const hits = [];
-    if (!total) {
-      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
-      ctx.fillStyle = cssVar('--surface-2'); ctx.fill();
-      ctx.fillStyle = cssVar('--muted'); ctx.font = '14px -apple-system, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('Sin datos', cx, cy);
-    } else {
+    const cx = size / 2, cy = size / 2, R = size / 2 - 10, r = R * 0.6;
+    const surface = cssVar('--surface'), surface2 = cssVar('--surface-2'), text = cssVar('--text'), muted = cssVar('--muted');
+
+    const paint = p => {
+      const vals = all.map(s => ({ s, v: (from[s.key] || 0) + ((target[s.key] || 0) - (from[s.key] || 0)) * p }));
+      const total = vals.reduce((a, x) => a + x.v, 0);
+      ctx.clearRect(0, 0, size, size);
+      if (total < 0.001) {
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
+        ctx.fillStyle = surface2; ctx.fill();
+        ctx.fillStyle = muted; ctx.font = '14px -apple-system, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('Sin datos', cx, cy);
+        return [];
+      }
+      const hits = [];
       let a = -Math.PI / 2;
-      slices.filter(s => s.value).forEach(s => {
-        const da = (s.value / total) * Math.PI * 2;
-        ctx.beginPath(); ctx.arc(cx, cy, R, a, a + da); ctx.arc(cx, cy, r, a + da, a, true); ctx.closePath();
+      vals.forEach(({ s, v }) => {
+        if (v <= 0) return;
+        const da = (v / total) * Math.PI * 2;
+        const isSel = selected && s.key === selected;
+        const off = isSel ? 7 * p : 0; // la parte elegida sale un poco
+        const mid = a + da / 2;
+        const ox = Math.cos(mid) * off, oy = Math.sin(mid) * off;
+        ctx.globalAlpha = selected && !isSel ? 0.28 : 1;
+        ctx.beginPath(); ctx.arc(cx + ox, cy + oy, R, a, a + da); ctx.arc(cx + ox, cy + oy, r, a + da, a, true); ctx.closePath();
         ctx.fillStyle = s.color; ctx.fill();
-        ctx.strokeStyle = cssVar('--surface'); ctx.lineWidth = 2; ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = surface; ctx.lineWidth = 2; ctx.stroke();
         hits.push({ key: s.key, a0: a, a1: a + da });
         a += da;
       });
-      ctx.fillStyle = cssVar('--text'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = '700 30px -apple-system, sans-serif'; ctx.fillText(String(total), cx, cy - 8);
-      ctx.fillStyle = cssVar('--muted'); ctx.font = '13px -apple-system, sans-serif'; ctx.fillText('gestiones', cx, cy + 16);
+      const center = selected ? (target[selected] || 0) : Math.round(total);
+      ctx.fillStyle = text; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '700 30px -apple-system, sans-serif'; ctx.fillText(String(Math.round(selected ? (from[selected] || 0) + (center - (from[selected] || 0)) * p : total)), cx, cy - 8);
+      ctx.fillStyle = muted; ctx.font = '13px -apple-system, sans-serif'; ctx.fillText(selected ? 'seleccionadas' : 'gestiones', cx, cy + 16);
+      return hits;
+    };
+
+    const finalize = () => { st.hits = paint(1); };
+    if (REDUCED) finalize();
+    else {
+      const t0 = performance.now();
+      const step = now => {
+        if (st.token !== token) return;
+        const t = Math.min(1, (now - t0) / ANIM_MS);
+        st.hits = paint(ease(t));
+        if (t < 1) requestAnimationFrame(step);
+      };
+      st.hits = paint(0);
+      requestAnimationFrame(step);
     }
-    ui.donuts[canvasId] = { hits, cx, cy, R, r, kind };
+    Object.assign(st, { cx, cy, R: R + 8, r, kind });
+
+    const total = slices.reduce((s, x) => s + x.value, 0);
     $(legendId).innerHTML = slices.map(s => `
-      <li data-${kind === 'estado' ? 'est' : 'resp'}="${esc(s.key)}">
+      <li data-${kind === 'estado' ? 'est' : 'resp'}="${esc(s.key)}" class="${selected === s.key ? 'selected' : ''}${selected && selected !== s.key ? ' faded' : ''}">
         <span class="sw" style="background:${s.color}"></span><span class="lb">${esc(s.label)}</span>
         <span class="ct">${s.value}</span><span class="pc">${total ? Math.round((s.value / total) * 100) : 0}%</span></li>`).join('');
   }
 
   function donutClick(canvasId, e) {
     const d = ui.donuts[canvasId];
-    if (!d) return;
+    if (!d || !d.hits) return;
     const rect = $(canvasId).getBoundingClientRect();
     const x = e.clientX - rect.left - d.cx, y = e.clientY - rect.top - d.cy;
     const dist = Math.hypot(x, y);
@@ -577,15 +697,15 @@
     if (ang < -Math.PI / 2) ang += Math.PI * 2;
     const h = d.hits.find(s => ang >= s.a0 && ang < s.a1);
     if (!h) return;
-    if (d.kind === 'estado') goGestiones({ estatus: h.key });
-    else goGestiones({ responsable: h.key });
+    if (d.kind === 'estado') toggleDash('dEstatus', h.key);
+    else if (h.key !== '__otros') toggleDash('dResponsable', h.key);
   }
 
   function goGestiones(f) {
     // Lleva también los filtros que estén puestos en el Inicio
     const df = ui.section === 'dashboard' ? dashFilters() : {};
     setupGestionFilters();
-    $('gFilterEstatus').value = f.estatus || '';
+    $('gFilterEstatus').value = f.estatus !== undefined ? f.estatus : (df.estatus || '');
     const resp = f.responsable && f.responsable !== '__otros' ? f.responsable : (df.responsable || '');
     $('gFilterResponsable').value = resp;
     $('gFilterDependencia').value = df.dependencia || '';
@@ -1250,13 +1370,14 @@
     // Inicio
     $('taskCards').addEventListener('click', e => {
       const c = e.target.closest('[data-card]');
-      if (c) goGestiones({ estatus: c.dataset.card });
+      if (c) toggleDash('dEstatus', c.dataset.card);
     });
     $('donutEstado').addEventListener('click', e => donutClick('donutEstado', e));
     $('donutResp').addEventListener('click', e => donutClick('donutResp', e));
-    $('legendEstado').addEventListener('click', e => { const li = e.target.closest('[data-est]'); if (li) goGestiones({ estatus: li.dataset.est }); });
-    $('legendResp').addEventListener('click', e => { const li = e.target.closest('[data-resp]'); if (li) goGestiones({ responsable: li.dataset.resp }); });
-    $('respBars').addEventListener('click', e => { const r = e.target.closest('[data-resp]'); if (r) goGestiones({ responsable: r.dataset.resp }); });
+    $('legendEstado').addEventListener('click', e => { const li = e.target.closest('[data-est]'); if (li) toggleDash('dEstatus', li.dataset.est); });
+    $('legendResp').addEventListener('click', e => { const li = e.target.closest('[data-resp]'); if (li && li.dataset.resp !== '__otros') toggleDash('dResponsable', li.dataset.resp); });
+    $('respBars').addEventListener('click', e => { const r = e.target.closest('[data-resp]'); if (r) toggleDash('dResponsable', r.dataset.resp); });
+    $('dViewList').addEventListener('click', () => goGestiones({}));
     D_IDS.forEach(id => $(id).addEventListener('change', renderDashboard));
     $('dClear').addEventListener('click', () => { D_IDS.forEach(id => { $(id).value = ''; }); renderDashboard(); });
     $('hotList').addEventListener('click', e => { const li = e.target.closest('li[data-colonia]'); if (li) goToMapColonia(li.dataset.colonia); });

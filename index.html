@@ -110,6 +110,7 @@
           <div class="toolbar">
             <label class="inline-label">Desde <input type="date" class="input" id="dDesde"></label>
             <label class="inline-label">Hasta <input type="date" class="input" id="dHasta"></label>
+            <select class="input" id="dEstatus" aria-label="Estado"></select>
             <select class="input" id="dResponsable" aria-label="Responsable"></select>
             <select class="input" id="dDependencia" aria-label="Dependencia"></select>
             <select class="input" id="dPrioridad" aria-label="Prioridad"></select>
@@ -117,18 +118,18 @@
             <select class="input" id="dFuente" aria-label="Fuente de ingreso"></select>
             <select class="input" id="dColonia" aria-label="Colonia"></select>
           </div>
-          <div class="dash-summary"><span class="muted" id="dSummary"></span><button class="btn btn-outline btn-sm hidden" id="dClear">✕ Limpiar filtros</button></div>
+          <div class="dash-summary"><span class="muted" id="dSummary"></span><button class="btn btn-outline btn-sm" id="dViewList">📋 Ver estas gestiones</button><button class="btn btn-outline btn-sm hidden" id="dClear">✕ Limpiar filtros</button></div>
         </div>
         <div class="cards" id="taskCards"></div>
         <div class="grid-2">
           <div class="panel">
             <h3 class="panel-title">Tareas por estado</h3>
-            <p class="panel-hint">Toca una parte del círculo o de la lista para ver esas gestiones.</p>
+            <p class="panel-hint">Toca una parte para filtrar todo el tablero.</p>
             <div class="donut-wrap"><canvas id="donutEstado" class="donut"></canvas><ul class="donut-legend" id="legendEstado"></ul></div>
           </div>
           <div class="panel">
             <h3 class="panel-title">Tareas por responsable</h3>
-            <p class="panel-hint">Toca una parte del círculo o de la lista para ver sus gestiones.</p>
+            <p class="panel-hint">Toca una persona para filtrar todo el tablero.</p>
             <div class="donut-wrap"><canvas id="donutResp" class="donut"></canvas><ul class="donut-legend" id="legendResp"></ul></div>
           </div>
         </div>

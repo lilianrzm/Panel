@@ -377,3 +377,16 @@ legend { padding: 0 6px; font-weight: 700; color: var(--primary); font-size: 14p
 .combo-list li.none { color: var(--muted); cursor: default; }
 .combo-list mark { background: #fde68a; color: inherit; border-radius: 2px; padding: 0 1px; }
 .combo.up .combo-list { top: auto; bottom: calc(100% + 4px); }
+
+/* ===== v4: tablero interactivo y animado ===== */
+.card { transition: box-shadow .25s, transform .15s; }
+.card.selected { box-shadow: 0 0 0 3px var(--c), 0 6px 18px rgba(0,0,0,.08); }
+.donut-legend li { transition: opacity .3s; }
+.donut-legend li.selected { background: var(--primary-soft); font-weight: 700; }
+.donut-legend li.faded { opacity: .4; }
+.bar-row { transition: opacity .3s, background .2s; }
+.bar-row.selected { background: var(--primary-soft); }
+.bar-row.faded { opacity: .35; }
+.bar-track, .bar-track > div, .hot-bar { transition: width .65s cubic-bezier(.22, 1, .36, 1); }
+.hot-label { display: block; }
+@media (prefers-reduced-motion: reduce) { .bar-track, .bar-track > div, .hot-bar, .card { transition: none; } }
