@@ -164,6 +164,23 @@ const Combo = (() => {
     let items = [];
     let active = 0;
     let isOpen = false;
+    // Botón ✕ para dejar el campo vacío
+    let clearBtn = null;
+    if (opts.clearable) {
+      wrap.classList.add('clearable');
+      clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'combo-clear';
+      clearBtn.setAttribute('aria-label', opts.clearLabel || 'Quitar');
+      clearBtn.title = opts.clearLabel || 'Quitar';
+      clearBtn.textContent = '✕';
+      wrap.appendChild(clearBtn);
+      clearBtn.addEventListener('pointerdown', e => e.preventDefault());
+      clearBtn.addEventListener('click', () => { input.value = ''; close(); syncClear(); if (opts.onPick) opts.onPick(null, ''); });
+    }
+    function syncClear() { if (clearBtn) clearBtn.classList.toggle('hidden', !input.value.trim()); }
+    input.addEventListener('input', syncClear);
+    input._syncClear = syncClear;
 
     function render() {
       const q = norm(input.value);
@@ -189,7 +206,8 @@ const Combo = (() => {
       const exact = q && all.some(it => norm(it.value) === q);
       const free = q && !exact ? input.value.trim() : '';
       active = Math.min(active, Math.max(0, items.length - 1));
-      list.innerHTML = items.map((it, i) => `<li data-i="${i}" class="${i === active ? 'active' : ''}">${highlight(it.label, q)}${it.sub ? `<small>${highlight(it.sub, q)}</small>` : ''}</li>`).join('') +
+      const emptyOpt = opts.emptyLabel && input.value.trim() === '' ? `<li class="empty-opt" data-empty="1">${esc(opts.emptyLabel)}</li>` : '';
+      list.innerHTML = emptyOpt + items.map((it, i) => `<li data-i="${i}" class="${i === active ? 'active' : ''}">${highlight(it.label, q)}${it.sub ? `<small>${highlight(it.sub, q)}</small>` : ''}</li>`).join('') +
         (free ? `<li class="free" data-free="1">＋ Usar “${esc(free)}” (nombre nuevo)</li>` : '') +
         (!items.length && !free ? '<li class="none">Escribe un nombre</li>' : '');
     }
@@ -205,6 +223,7 @@ const Combo = (() => {
     function pick(it) {
       if (it) input.value = it.value;
       close();
+      syncClear();
       input.blur();
       if (opts.onPick) opts.onPick(it || null, input.value);
     }
@@ -221,6 +240,7 @@ const Combo = (() => {
       e.preventDefault();
       const li = e.target.closest('li');
       if (!li || li.classList.contains('none')) return;
+      if (li.dataset.empty) { input.value = ''; pick(null); syncClear(); return; }
       if (li.dataset.free) pick(null);
       else pick(items[Number(li.dataset.i)]);
     });
@@ -229,7 +249,8 @@ const Combo = (() => {
       close();
       if (opts.onPick) opts.onPick(null, input.value); // valor escrito a mano
     }, 150));
-    return { close };
+    syncClear();
+    return { close, sync: syncClear };
   }
 
   return { enhance, suggest };

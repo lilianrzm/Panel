@@ -23,7 +23,7 @@
   ];
   const PALETTE = ['#2563eb', '#d97706', '#059669', '#db2777', '#7c3aed', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#be123c'];
   const GRAY = '#94a3b8';
-  const APP_VERSION = '12 · 18/11/2026';
+  const APP_VERSION = '13 · 18/11/2026';
   const DEFAULT_NAME = 'Gestor-S';
   const PREFS_KEY = 'panel.prefs';
   const LOCK_WHEN_HIDDEN_MS = 30 * 1000;
@@ -930,6 +930,7 @@
     showColHint(src.colonia);
     toggleArea('fDependencia', 'fAreaGroup');
     showRespHint(findContacto(src.responsable), false);
+    if (ui.respCombo) ui.respCombo.sync();
     $('fFechaIngreso').value = src.fechaIngreso || today();
     $('fFechaAct').value = g ? fmtDate(g.fechaActualizacion) : 'Se asigna al guardar';
     checkCurp();
@@ -1888,7 +1889,10 @@
     $('dirExport').addEventListener('click', exportDirectorio);
 
     // Responsable con sugerencias del directorio
-    Combo.suggest($('fResponsable'), responsableSuggestions, { onPick: (it, text) => applyResponsable(it ? it.value : text) });
+    ui.respCombo = Combo.suggest($('fResponsable'), responsableSuggestions, {
+      clearable: true, clearLabel: 'Quitar responsable', emptyLabel: '— Sin responsable —',
+      onPick: (it, text) => applyResponsable(it ? it.value : text)
+    });
     $('fDependencia').addEventListener('change', () => toggleArea('fDependencia', 'fAreaGroup'));
     D_IDS.forEach(id => $(id).addEventListener('change', renderDashboard));
     $('dClear').addEventListener('click', () => { D_IDS.forEach(id => { $(id).value = ''; }); renderDashboard(); });
