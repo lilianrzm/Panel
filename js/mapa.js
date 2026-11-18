@@ -153,7 +153,7 @@ const MapaGeo = (() => {
     const home = () => boxToView(homeBox, built.W, built.H, aspect);
     let vb = opts.keepView && opts.keepView.view === view && opts.keepView.vb ? Object.assign({}, opts.keepView.vb) : home();
     const bubbles = [];
-    const pxScale = () => vb.w / (container.getBoundingClientRect().width || 800);
+    const pxScale = () => { const r = container.getBoundingClientRect(); return Math.max(vb.w / (r.width || 800), vb.h / (r.height || 560)); };
     const sizeBubbles = () => {
       const k = pxScale();
       bubbles.forEach(b => {

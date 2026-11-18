@@ -23,7 +23,7 @@
   ];
   const PALETTE = ['#2563eb', '#d97706', '#059669', '#db2777', '#7c3aed', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#be123c'];
   const GRAY = '#94a3b8';
-  const APP_VERSION = '8 · 18/11/2026';
+  const APP_VERSION = '9 · 18/11/2026';
   const DEFAULT_NAME = 'Gestor-S';
   const PREFS_KEY = 'panel.prefs';
   const LOCK_WHEN_HIDDEN_MS = 30 * 1000;
@@ -1170,6 +1170,35 @@
     return cat.find(d => norm(d) === n) || cat.find(d => norm(d).includes(n) || n.includes(norm(d))) || name;
   }
 
+  async function importColSec(file) {
+    if (!file) return;
+    try {
+      const rows = /\.csv$/i.test(file.name) ? parseCsv(await readFileText(file)) : await XLSX.read(file);
+      const hi = rows.findIndex(r => r.some(c => norm(c) === 'colonia'));
+      if (hi < 0) return toast('No encontré una columna “Colonia”.', 4000);
+      const ci = rows[hi].findIndex(c => norm(c) === 'colonia');
+      const si = rows[hi].findIndex(c => ['seccion', 'seccion electoral', 'secc'].includes(norm(c)));
+      if (si < 0) return toast('No encontré una columna “Sección”.', 4000);
+      data.config.colSec = data.config.colSec || {};
+      let n = 0;
+      rows.slice(hi + 1).forEach(r => {
+        const col = String(r[ci] || '').trim(), sec = MapaGeo.normSeccion(r[si]);
+        if (col && sec) { data.config.colSec[MapaGeo.normColonia(col)] = { colonia: col, seccion: sec }; n++; }
+      });
+      await persist();
+      refreshCurrent();
+      toast(`${n} colonias ligadas a su sección.`, 4000);
+    } catch (err) { toast(err.message || 'No se pudo leer el archivo.', 4000); }
+  }
+  async function exportColSec() {
+    const m = colSecMap();
+    const labels = uniqueBy('colonia', MapaGeo.normColonia);
+    Object.entries(data.config.colSec || {}).forEach(([k, v]) => { if (!labels.has(k)) labels.set(k, v.colonia); });
+    const rows = Object.entries(m).map(([k, sec]) => [labels.get(k) || k, Number(sec)]).sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'es'));
+    if (!rows.length) return toast('Aún no hay colonias ligadas a secciones.');
+    await deliverFile(XLSX.build([{ name: 'Colonias', columns: [{ header: 'Colonia', width: 36 }, { header: 'Sección', width: 10, type: 'number' }], rows }]), `colonias-secciones-${today()}.xlsx`);
+  }
+
   async function exportDirectorio() {
     if (!data.directorio.length) return toast('El directorio está vacío.');
     const cols = [['Título', 8, 'titulo'], ['Nombre', 34, 'nombre'], ['Cargo', 14, 'cargo'], ['Dependencia', 52, 'dependencia'], ['Área', 20, 'area'], ['Teléfono', 16, 'telefono'], ['Extensión', 10, 'extension'], ['Correo', 26, 'correo'], ['Notas', 30, 'notas']];
@@ -1184,10 +1213,42 @@
       medio: $('mMedio').value, fuente: $('mFuente').value, desde: $('mDesde').value, hasta: $('mHasta').value
     };
   }
+  // ---- Colonia → sección: catálogo propio + lo aprendido de tus gestiones ----
+  function colSecMap() {
+    const learned = {};
+    data.gestiones.forEach(g => {
+      const k = MapaGeo.normColonia(g.colonia), sec = MapaGeo.normSeccion(g.seccion);
+      if (!k || !sec) return;
+      const m = learned[k] || (learned[k] = {});
+      m[sec] = (m[sec] || 0) + 1;
+    });
+    const out = {};
+    Object.entries(learned).forEach(([k, m]) => { out[k] = Object.entries(m).sort((a, b) => b[1] - a[1])[0][0]; });
+    Object.entries(data.config.colSec || {}).forEach(([k, v]) => { if (v && v.seccion) out[k] = MapaGeo.normSeccion(v.seccion); });
+    return out;
+  }
+  // Sección de una gestión: la suya, o la de su colonia
+  function seccionDe(g, map) {
+    const own = MapaGeo.normSeccion(g.seccion);
+    if (own) return { sec: own, viaColonia: false };
+    const k = MapaGeo.normColonia(g.colonia);
+    return k && map[k] ? { sec: map[k], viaColonia: true } : { sec: '', viaColonia: false };
+  }
+  async function setColSec(colonia, seccion) {
+    const k = MapaGeo.normColonia(colonia);
+    const sec = MapaGeo.normSeccion(seccion);
+    if (!k) return;
+    data.config.colSec = data.config.colSec || {};
+    if (sec) data.config.colSec[k] = { colonia: colonia.trim(), seccion: sec };
+    else delete data.config.colSec[k];
+    await persist();
+  }
+
   function mapGroups(view, list) {
     const groups = {};
+    const csm = view === 'seccion' ? colSecMap() : null;
     list.forEach(g => {
-      const key = view === 'seccion' ? MapaGeo.normSeccion(g.seccion) : MapaGeo.normColonia(g.colonia);
+      const key = view === 'seccion' ? seccionDe(g, csm).sec : MapaGeo.normColonia(g.colonia);
       if (!key) return;
       const grp = groups[key] || (groups[key] = { key, label: view === 'seccion' ? 'Sección ' + key : g.colonia, total: 0, items: [] });
       grp.total++;
@@ -1219,7 +1280,19 @@
     const groups = mapGroups(view, applyFilters(data.gestiones, mapFilters()));
     const area = $('mapArea');
     const geo = await getCarto(view);
-    const onSelect = key => { ui.mapSelected = key; showMapDetail(groups[key], view, key); };
+    const onSelect = key => {
+      if (ui.assignColonia) { // modo "ubicar colonia": el toque asigna la sección
+        const col = ui.assignColonia;
+        ui.assignColonia = null;
+        setColSec(col, key).then(() => { toast(`“${col}” quedó en la sección ${key}. Sus gestiones ya aparecen en el mapa.`, 4500); ui.mapSelected = key; renderMapa(); });
+        return;
+      }
+      ui.mapSelected = key; showMapDetail(groups[key], view, key);
+    };
+    $('assignBanner').classList.toggle('hidden', !ui.assignColonia);
+    if (ui.assignColonia) $('assignText').textContent = `📍 Toca en el mapa la sección donde está la colonia “${ui.assignColonia}”.`;
+    area.classList.toggle('assigning', !!ui.assignColonia);
+    renderUnplaced(view);
     if (geo) {
       const r = MapaGeo.renderChoropleth(area, geo, view, groups, { selected: ui.mapSelected, onSelect, keepView: ui.mapView || (ui.mapView = {}) });
       $('mapLegend').innerHTML = `<span>Menos</span><span class="legend-bar"></span><span>Más gestiones</span>` +
@@ -1234,6 +1307,33 @@
     }
     if (ui.mapSelected) showMapDetail(groups[ui.mapSelected] || null, view, ui.mapSelected);
     else $('mapDetail').innerHTML = '<p class="muted">Toca una zona del mapa para ver sus gestiones.</p>';
+  }
+
+  // Colonias cuyas gestiones no tienen sección y aún no se sabe dónde van
+  function renderUnplaced(view) {
+    const box = $('unplaced');
+    if (view !== 'seccion') { box.classList.add('hidden'); return; }
+    const csm = colSecMap();
+    const pend = new Map();
+    let sinNada = 0;
+    applyFilters(data.gestiones, mapFilters()).forEach(g => {
+      if (seccionDe(g, csm).sec) return;
+      const k = MapaGeo.normColonia(g.colonia);
+      if (!k) { sinNada++; return; }
+      const p = pend.get(k) || { label: g.colonia, n: 0 };
+      p.n++;
+      pend.set(k, p);
+    });
+    if (!pend.size && !sinNada) { box.classList.add('hidden'); return; }
+    const rows = [...pend.values()].sort((a, b) => b.n - a.n);
+    box.innerHTML = `<h4>Gestiones que aún no aparecen en el mapa</h4>
+      <p class="muted">Indica una sola vez en qué sección está cada colonia: escribe el número o toca “Ubicar en el mapa”. Todas las gestiones de esa colonia (las de ahora y las futuras) aparecerán ahí.</p>
+      ${rows.map(r => `<div class="unplaced-row"><span><strong>${esc(r.label)}</strong> <span class="muted">· ${plural(r.n, 'gestión').replace('gestións', 'gestiones')}</span></span>
+        <button class="btn btn-outline btn-sm" data-ubicar="${esc(r.label)}">📍 Ubicar en el mapa</button>
+        <input class="input" inputmode="numeric" placeholder="Sección" data-colsec-input="${esc(r.label)}">
+        <button class="btn btn-primary btn-sm" data-colsec-save="${esc(r.label)}">Guardar</button></div>`).join('')}
+      ${sinNada ? `<p class="muted" style="margin-top:8px">${plural(sinNada, 'gestión').replace('gestións', 'gestiones')} sin colonia ni sección.</p>` : ''}`;
+    box.classList.remove('hidden');
   }
 
   function countBy(items, getter) {
@@ -1259,7 +1359,7 @@
       <h5>Por dependencia</h5>${countBy(grp.items, g => g.dependencia)}
       <h5>Por medio de recepción</h5>${countBy(grp.items, g => g.medio)}
       <h5>Gestiones</h5>
-      <ul class="mini-list">${grp.items.sort((a, b) => b.id - a.id).map(g => `<li data-open-gestion="${g.id}"><strong>#${g.id}</strong> ${esc(dash(g.solicitante))}<br><span class="muted">${esc(ESTATUS_LABEL[g.estatus] || '')}${isVencida(g) ? ' · Vencida' : ''}${g.responsable ? ' · ' + esc(g.responsable) : ''}</span></li>`).join('')}</ul>
+      <ul class="mini-list">${grp.items.sort((a, b) => b.id - a.id).map(g => `<li data-open-gestion="${g.id}"><strong>#${g.id}</strong> ${esc(dash(g.solicitante))}${view === 'seccion' && !g.seccion && g.colonia ? ` <span class="via-col">(por colonia ${esc(g.colonia)})</span>` : ''}<br><span class="muted">${esc(ESTATUS_LABEL[g.estatus] || '')}${isVencida(g) ? ' · Vencida' : ''}${g.responsable ? ' · ' + esc(g.responsable) : ''}</span></li>`).join('')}</ul>
       <div class="actions" style="margin-top:12px">
         ${view === 'colonia' ? `<button class="btn btn-outline btn-sm" data-report-colonia="${esc(key)}">Ver reporte</button>
         <button class="btn btn-outline btn-sm" data-event-colonia="${esc(grp.label)}">Agendar evento aquí</button>` : ''}
@@ -1510,6 +1610,8 @@
     [['catDependencias', 'dependencias'], ['catResponsables', 'responsables'], ['catMedios', 'medios'], ['catFuentes', 'fuentes'], ['catTipos', 'tipos'], ['catMunicipios', 'municipios']]
       .forEach(([id, k]) => { $(id).value = (c[k] || []).join('\n'); });
     renderBioStatus();
+    const nManual = Object.keys(data.config.colSec || {}).length, nTotal = Object.keys(colSecMap()).length;
+    $('cfgColSecStatus').textContent = nTotal ? `${nTotal} colonias ligadas a una sección (${nManual} indicadas por ti, ${nTotal - nManual} aprendidas de tus gestiones).` : 'Aún no hay colonias ligadas a secciones.';
     const [sec, col] = await Promise.all([getCarto('seccion'), getCarto('colonia')]);
     $('cfgCartoStatus').textContent = `${sec ? `Secciones: ${sec.features.length} zonas${sec._builtin ? ' (incluidas en la app: municipio de Chihuahua, INE)' : ' cargadas'}.` : 'Secciones: sin cargar.'} ${col ? `Colonias: ${col.features.length} zonas cargadas.` : 'Colonias: sin cargar.'}`;
   }
@@ -1669,6 +1771,25 @@
     $('barsEstado').addEventListener('click', e => { const r = e.target.closest('[data-est]'); if (r) toggleDash('dEstatus', r.dataset.est); });
     $('barsResp').addEventListener('click', e => { const r = e.target.closest('[data-resp]'); if (r && r.dataset.resp !== '__otros') toggleDash('dResponsable', r.dataset.resp); });
 
+    // Mapa: ubicar colonias
+    $('unplaced').addEventListener('click', async e => {
+      const u = e.target.closest('[data-ubicar]');
+      if (u) { ui.assignColonia = u.dataset.ubicar; ui.mapSelected = null; renderMapa(); $('mapArea').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      const sv = e.target.closest('[data-colsec-save]');
+      if (sv) {
+        const col = sv.dataset.colsecSave;
+        const inp = [...document.querySelectorAll('[data-colsec-input]')].find(i => i.dataset.colsecInput === col);
+        const sec = MapaGeo.normSeccion(inp && inp.value);
+        if (!sec) return toast('Escribe el número de sección.');
+        await setColSec(col, sec);
+        toast(`“${col}” quedó en la sección ${sec}.`);
+        renderMapa();
+      }
+    });
+    $('assignCancel').addEventListener('click', () => { ui.assignColonia = null; renderMapa(); });
+    $('cfgColSecImport').addEventListener('change', e => { importColSec(e.target.files[0]); e.target.value = ''; });
+    $('cfgColSecExport').addEventListener('click', exportColSec);
+
     // Directorio
     $('dirSearch').addEventListener('input', renderDirectorio);
     $('dirDependencia').addEventListener('change', renderDirectorio);
@@ -1748,10 +1869,8 @@
       if ($('fSeccion').value.trim()) return;
       const k = MapaGeo.normColonia($('fColonia').value);
       if (!k) return;
-      const c = {};
-      data.gestiones.forEach(g => { if (g.seccion && MapaGeo.normColonia(g.colonia) === k) c[g.seccion] = (c[g.seccion] || 0) + 1; });
-      const best = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
-      if (best) { $('fSeccion').value = best[0]; toast(`Sección ${best[0]} sugerida por la colonia (puedes cambiarla).`); }
+      const sec = colSecMap()[k];
+      if (sec) { $('fSeccion').value = sec; toast(`Sección ${sec} según la colonia (puedes cambiarla).`); }
     });
     $('gDeleteBtn').addEventListener('click', () => { if (ui.editingGestion) deleteGestion(ui.editingGestion.id); });
     $('gScheduleBtn').addEventListener('click', () => {

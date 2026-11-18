@@ -206,6 +206,7 @@
             <label class="inline-label">Desde <input type="date" class="input" id="mDesde"></label>
             <label class="inline-label">Hasta <input type="date" class="input" id="mHasta"></label>
           </div>
+          <div class="banner assign-banner hidden" id="assignBanner"><span id="assignText"></span><button class="btn btn-outline btn-sm" id="assignCancel">Cancelar</button></div>
           <div class="map-layout">
             <div class="map-area" id="mapArea"></div>
             <aside class="map-detail" id="mapDetail">
@@ -213,6 +214,7 @@
             </aside>
           </div>
           <div class="legend" id="mapLegend"></div>
+          <div class="unplaced hidden" id="unplaced"></div>
         </div>
       </section>
 
@@ -389,6 +391,16 @@
                 <input type="file" id="cfgCartoColonia" accept=".geojson,.json,application/json,application/geo+json">
               </label>
               <button class="btn btn-danger btn-sm" id="cfgCartoClear">Quitar cartografía</button>
+            </div>
+            <hr class="sep">
+            <h4 class="sub-title">Colonias ↔ secciones</h4>
+            <p class="muted" id="cfgColSecStatus"></p>
+            <p class="muted">Sirve para que las gestiones que solo tienen colonia aparezcan en el mapa por sección. Excel con columnas “Colonia” y “Sección”.</p>
+            <div class="actions">
+              <label class="btn btn-outline btn-sm file-btn">⬆ Importar colonias y secciones
+                <input type="file" id="cfgColSecImport" accept=".xlsx,.csv">
+              </label>
+              <button class="btn btn-outline btn-sm" id="cfgColSecExport">⬇ Exportar</button>
             </div>
           </div>
         </div>
