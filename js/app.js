@@ -23,7 +23,7 @@
   ];
   const PALETTE = ['#2563eb', '#d97706', '#059669', '#db2777', '#7c3aed', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#be123c'];
   const GRAY = '#94a3b8';
-  const APP_VERSION = '11 · 18/11/2026';
+  const APP_VERSION = '12 · 18/11/2026';
   const DEFAULT_NAME = 'Gestor-S';
   const PREFS_KEY = 'panel.prefs';
   const LOCK_WHEN_HIDDEN_MS = 30 * 1000;
@@ -862,7 +862,7 @@
     const list = applyFilters(data.gestiones, f).filter(g => {
       if (sinUb && (g.colonia || g.seccion)) return false;
       if (q) {
-        const hay = norm([g.id, '#' + g.id, g.solicitante, g.curp, g.telefono, g.responsable, g.colonia, g.seccion, g.municipio, g.dependencia, g.area, g.tipo, g.medio, g.fuente, g.descripcion, g.observaciones].join(' '));
+        const hay = norm([g.id, '#' + g.id, g.solicitante, g.curp, g.telefono, g.responsable, g.calle, g.numero, g.cp, g.colonia, g.seccion, g.municipio, g.dependencia, g.area, g.tipo, g.medio, g.fuente, g.descripcion, g.observaciones].join(' '));
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -875,7 +875,7 @@
         <td>${esc(dash(g.responsable))}</td>
         <td>${esc(dash(g.dependencia))}${g.area ? `<br><span class="muted">${esc(g.area)}</span>` : ''}</td>
         <td>${prioridadBadge(g.prioridad)}</td>
-        <td>${esc(dash(g.colonia))}${g.seccion ? `<br><span class="muted">Secc. ${esc(g.seccion)}</span>` : ''}</td>
+        <td>${esc(dash(g.colonia))}${g.calle ? `<br><span class="muted">${esc([g.calle, g.numero].filter(Boolean).join(' '))}</span>` : ''}${g.seccion ? `<br><span class="muted">Secc. ${esc(g.seccion)}</span>` : ''}</td>
         <td data-estado-cell>${estadoCell(g)}</td>
         <td class="nowrap">${fechasCell(g)}</td>
       </tr>`).join('') : `<tr><td colspan="8" class="empty">${data.gestiones.length ? 'Ninguna gestión coincide con los filtros.' : 'Aún no hay gestiones. Toca “Nueva gestión” para capturar la primera.'}</td></tr>`;
@@ -921,6 +921,8 @@
     fillSelect($('fEstatus'), ESTATUS, { value: src.estatus || 'capturado' });
     const set = (id, v) => { $(id).value = v || ''; };
     set('fResponsable', src.responsable); set('fSolicitante', src.solicitante); set('fCurp', src.curp);
+    set('fCalle', src.calle); set('fNumero', src.numero); set('fCp', src.cp);
+    $('fCp').dataset.auto = src.cp ? '' : '1';
     set('fColonia', src.colonia); set('fSeccion', src.seccion); set('fMunicipio', src.municipio); set('fTelefono', src.telefono);
     set('fTipo', src.tipo); set('fMonto', src.monto || ''); set('fDescripcion', src.descripcion);
     set('fPrimerContacto', src.primerContacto); set('fFechaLimite', src.fechaLimite); set('fObservaciones', src.observaciones);
@@ -951,6 +953,7 @@
     const montoRaw = $('fMonto').value;
     const form = {
       responsable: v('fResponsable'), solicitante: v('fSolicitante'), curp: v('fCurp').toUpperCase(),
+      calle: v('fCalle'), numero: v('fNumero'), cp: MapaGeo.normCp(v('fCp')),
       colonia: v('fColonia'), seccion: v('fSeccion'), municipio: v('fMunicipio'), telefono: v('fTelefono'),
       medio: $('fMedio').value, fechaIngreso: $('fFechaIngreso').value || today(),
       tipo: v('fTipo'), monto: montoRaw === '' ? 0 : Math.max(0, parseFloat(montoRaw) || 0), descripcion: v('fDescripcion'),
@@ -962,7 +965,7 @@
     // Unifica cómo se escribe el responsable (mismo nombre que en el catálogo)
     const rn = responsablesMap().get(norm(form.responsable));
     if (rn) form.responsable = rn;
-    const llenos = ['responsable', 'solicitante', 'curp', 'colonia', 'seccion', 'telefono', 'medio', 'tipo', 'monto', 'descripcion', 'prioridad', 'dependencia', 'fuente', 'primerContacto', 'fechaLimite', 'observaciones', 'area'].some(k => form[k]);
+    const llenos = ['responsable', 'solicitante', 'curp', 'calle', 'numero', 'cp', 'colonia', 'seccion', 'telefono', 'medio', 'tipo', 'monto', 'descripcion', 'prioridad', 'dependencia', 'fuente', 'primerContacto', 'fechaLimite', 'observaciones', 'area'].some(k => form[k]);
     if (!llenos && !ui.editingGestion) {
       const ok = await confirmBox('No llenaste ningún dato. ¿Guardar la gestión vacía de todos modos?', 'Guardar vacía');
       if (!ok) return;
@@ -1264,7 +1267,7 @@
     const groups = {};
     const csm = view === 'seccion' ? colSecMap() : null;
     list.forEach(g => {
-      const key = view === 'seccion' ? seccionDe(g, csm).sec : view === 'zona' ? cpDeColonia(g.colonia) : MapaGeo.normColonia(g.colonia);
+      const key = view === 'seccion' ? seccionDe(g, csm).sec : view === 'zona' ? cpDe(g) : MapaGeo.normColonia(g.colonia);
       if (!key) return;
       const grp = groups[key] || (groups[key] = { key, label: view === 'seccion' ? 'Sección ' + key : view === 'zona' ? 'Zona CP ' + key : g.colonia, total: 0, items: [] });
       grp.total++;
@@ -1299,6 +1302,8 @@
     m.forEach(c => { cnt[c.cp] = (cnt[c.cp] || 0) + 1; });
     return Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0];
   }
+  const cpDe = g => MapaGeo.normCp(g.cp) || cpDeColonia(g.colonia);
+  const direccion = g => [[g.calle, g.numero].filter(Boolean).join(' '), g.colonia, g.cp ? 'CP ' + g.cp : ''].filter(Boolean).join(', ');
   function coloniasDeCp(cp) { return (coloniasCat || []).filter(c => c.cp === cp).map(c => c.n); }
   async function setColCp(colonia, cp) {
     const k = MapaGeo.normColonia(colonia);
@@ -1378,7 +1383,7 @@
     const pend = new Map();
     let sinNada = 0;
     applyFilters(data.gestiones, mapFilters()).forEach(g => {
-      if (view === 'seccion' ? seccionDe(g, csm).sec : cpDeColonia(g.colonia)) return;
+      if (view === 'seccion' ? seccionDe(g, csm).sec : cpDe(g)) return;
       const k = MapaGeo.normColonia(g.colonia);
       if (!k) { sinNada++; return; }
       const p = pend.get(k) || { label: g.colonia, n: 0 };
@@ -1423,7 +1428,7 @@
       <h5>Por medio de recepción</h5>${countBy(grp.items, g => g.medio)}
       ${view === 'zona' && coloniasDeCp(key).length ? `<h5>Colonias de esta zona</h5><p class="muted">${esc(coloniasDeCp(key).join(', '))}</p>` : ''}
       <h5>Gestiones</h5>
-      <ul class="mini-list">${grp.items.sort((a, b) => b.id - a.id).map(g => `<li data-open-gestion="${g.id}"><strong>#${g.id}</strong> ${esc(dash(g.solicitante))}${view === 'seccion' && !g.seccion && g.colonia ? ` <span class="via-col">(por colonia ${esc(g.colonia)})</span>` : ''}<br><span class="muted">${esc(ESTATUS_LABEL[g.estatus] || '')}${isVencida(g) ? ' · Vencida' : ''}${g.responsable ? ' · ' + esc(g.responsable) : ''}</span></li>`).join('')}</ul>
+      <ul class="mini-list">${grp.items.sort((a, b) => b.id - a.id).map(g => `<li data-open-gestion="${g.id}"><strong>#${g.id}</strong> ${esc(dash(g.solicitante))}${g.calle ? `<br><span class="muted">${esc(direccion(g))}</span>` : ''}${view === 'seccion' && !g.seccion && g.colonia ? ` <span class="via-col">(por colonia ${esc(g.colonia)})</span>` : ''}<br><span class="muted">${esc(ESTATUS_LABEL[g.estatus] || '')}${isVencida(g) ? ' · Vencida' : ''}${g.responsable ? ' · ' + esc(g.responsable) : ''}</span></li>`).join('')}</ul>
       <div class="actions" style="margin-top:12px">
         ${view === 'colonia' || view === 'zona' ? `<button class="btn btn-outline btn-sm" data-report-colonia="${esc(view === 'zona' ? MapaGeo.normColonia(grp.items[0].colonia) : key)}">Ver reporte</button>
         <button class="btn btn-outline btn-sm" data-event-colonia="${esc(grp.label)}">Agendar evento aquí</button>` : ''}
@@ -1432,7 +1437,7 @@
 
   function goToMapColonia(key) {
     const g = data.gestiones.find(x => MapaGeo.normColonia(x.colonia) === key);
-    const cp = g ? cpDeColonia(g.colonia) : '';
+    const cp = g ? cpDe(g) : '';
     $('mView').value = cp ? 'zona' : 'colonia';
     ui.mapSelected = cp || key;
     switchSection('mapa');
@@ -1612,7 +1617,7 @@
     $('rDetailTitle').textContent = `Detalle: ${list.length} ${list.length === 1 ? 'gestión' : 'gestiones'} · ${money(monto)}`;
     $('rTableBody').innerHTML = list.length ? list.map(g => `<tr data-open-gestion="${g.id}" style="cursor:pointer">
       <td class="folio">#${g.id}</td><td>${esc(dash(g.solicitante))}</td><td>${esc(dash(g.responsable))}</td><td>${esc(dash(g.dependencia))}${g.area ? `<br><span class="muted">${esc(g.area)}</span>` : ''}</td>
-      <td>${prioridadBadge(g.prioridad)}</td><td>${esc(dash(g.colonia))}</td>
+      <td>${prioridadBadge(g.prioridad)}</td><td>${esc(dash(g.colonia))}${g.calle ? `<br><span class="muted">${esc([g.calle, g.numero].filter(Boolean).join(' '))}</span>` : ''}</td>
       <td><span class="badge st-${esc(g.estatus)}">${esc(ESTATUS_LABEL[g.estatus] || g.estatus)}</span>${isVencida(g) ? '<span class="badge badge-vencida">Vencida</span>' : ''}</td>
       <td class="nowrap">${fmtDate(g.fechaIngreso)}</td><td class="nowrap">${fmtDate(g.fechaLimite)}</td><td class="num">${g.monto ? money(g.monto) : '—'}</td></tr>`).join('')
       : '<tr><td colspan="10" class="empty">Sin resultados con estos filtros.</td></tr>';
@@ -1626,14 +1631,14 @@
         name: 'Gestiones',
         columns: [
           { header: 'Folio', width: 8, type: 'number' }, { header: 'Responsable', width: 22 }, { header: 'Nombre completo', width: 28 },
-          { header: 'CURP', width: 21 }, { header: 'Teléfono', width: 14 }, { header: 'Colonia domicilio', width: 22 }, { header: 'Sección', width: 9 },
+          { header: 'CURP', width: 21 }, { header: 'Teléfono', width: 14 }, { header: 'Calle', width: 26 }, { header: 'Número', width: 10 }, { header: 'Código postal', width: 12 }, { header: 'Colonia domicilio', width: 22 }, { header: 'Sección', width: 9 },
           { header: 'Municipio', width: 15 }, { header: 'Medio de recepción', width: 24 }, { header: 'Fecha de ingreso', width: 15 },
           { header: 'Tipo de apoyo o petición', width: 24 }, { header: 'Detalle del problema', width: 50 }, { header: 'Monto estimado', width: 15, type: 'money' },
           { header: 'Prioridad', width: 10 }, { header: 'Dependencia responsable', width: 40 }, { header: 'Área (Gobierno del Estado)', width: 24 }, { header: 'Fuente de ingreso', width: 24 },
           { header: 'Primer contacto', width: 15 }, { header: 'Estado actual', width: 13 }, { header: 'Vencida', width: 9 }, { header: 'Fecha límite', width: 13 },
           { header: 'Última actualización', width: 18 }, { header: 'Observaciones', width: 50 }
         ],
-        rows: list.map(g => [g.id, g.responsable, g.solicitante, g.curp, g.telefono, g.colonia, g.seccion, g.municipio, g.medio, fmtDate(g.fechaIngreso),
+        rows: list.map(g => [g.id, g.responsable, g.solicitante, g.curp, g.telefono, g.calle, g.numero, g.cp, g.colonia, g.seccion, g.municipio, g.medio, fmtDate(g.fechaIngreso),
           g.tipo, g.descripcion, Number(g.monto) || 0, PRIORIDAD_LABEL[g.prioridad] || '', g.dependencia, g.area, g.fuente,
           g.primerContacto ? fmtDate(g.primerContacto) : '', ESTATUS_LABEL[g.estatus] || g.estatus, isVencida(g) ? 'Sí' : 'No',
           g.fechaLimite ? fmtDate(g.fechaLimite) : '', fmtDate(g.fechaActualizacion), g.observaciones])
@@ -1944,6 +1949,8 @@
     const coloniaElegida = () => {
       const name = $('fColonia').value;
       showColHint(name);
+      const cpc = cpDeColonia(name);
+      if (cpc && (!$('fCp').value.trim() || $('fCp').dataset.auto === '1')) { $('fCp').value = cpc; $('fCp').dataset.auto = '1'; }
       if ($('fSeccion').value.trim()) return;
       const k = MapaGeo.normColonia(name);
       if (!k) return;
@@ -1952,6 +1959,7 @@
     };
     Combo.suggest($('fColonia'), coloniaSuggestions, { onPick: (it, text) => { if (it) $('fColonia').value = it.value; coloniaElegida(); } });
     $('fColonia').addEventListener('change', coloniaElegida);
+    $('fCp').addEventListener('input', () => { $('fCp').dataset.auto = ''; });
     $('gDeleteBtn').addEventListener('click', () => { if (ui.editingGestion) deleteGestion(ui.editingGestion.id); });
     $('gScheduleBtn').addEventListener('click', () => {
       const g = ui.editingGestion;
