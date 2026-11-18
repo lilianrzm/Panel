@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- Bloquea cualquier conexión a otros sitios: los datos no pueden salir del dispositivo -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Panel">
+  <meta name="theme-color" content="#1f3a5f">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/app.css">
+  <title>Gestor-S</title>
+</head>
+<body>
+  <!-- Pantalla de bloqueo -->
+  <div class="lock-screen" id="lockScreen">
+    <div class="lock-box">
+      <div class="lock-logo" aria-hidden="true">🔒</div>
+      <h1 class="lock-title" data-system-name>Gestor-S</h1>
+      <p class="lock-subtitle">Sistema de Gestión Ciudadana</p>
+
+      <!-- Primera vez: crear contraseña -->
+      <form id="setupForm" class="hidden" autocomplete="off">
+        <p class="lock-info">Crea tu contraseña. Con ella se cifran todos tus datos en este iPad.</p>
+        <div class="form-group">
+          <label for="setupPass">Contraseña (mínimo 8 caracteres)</label>
+          <input type="password" id="setupPass" minlength="8" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label for="setupPass2">Confirmar contraseña</label>
+          <input type="password" id="setupPass2" minlength="8" autocomplete="new-password">
+        </div>
+        <p class="lock-warning">Si olvidas esta contraseña, nadie podrá recuperar tus datos. Guárdala en un lugar seguro.</p>
+        <button type="submit" class="btn btn-primary btn-block">Crear y entrar</button>
+        <button type="button" class="btn btn-link btn-block" id="showRestoreBtn">Restaurar desde un respaldo</button>
+      </form>
+
+      <!-- Restaurar respaldo en un dispositivo nuevo -->
+      <form id="restoreForm" class="hidden" autocomplete="off">
+        <p class="lock-info">Elige tu archivo de respaldo y escribe la contraseña con la que se creó.</p>
+        <div class="form-group">
+          <label for="restoreFile">Archivo de respaldo</label>
+          <input type="file" id="restoreFile" accept=".json,application/json">
+        </div>
+        <div class="form-group">
+          <label for="restorePass">Contraseña del respaldo</label>
+          <input type="password" id="restorePass" autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Restaurar y entrar</button>
+        <button type="button" class="btn btn-link btn-block" id="hideRestoreBtn">Volver</button>
+      </form>
+
+      <!-- Desbloquear -->
+      <form id="unlockForm" class="hidden" autocomplete="off">
+        <div class="form-group">
+          <label for="unlockPass">Contraseña</label>
+          <input type="password" id="unlockPass" autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+      </form>
+
+      <div class="lock-error" id="lockError" role="alert"></div>
+    </div>
+  </div>
+
+  <!-- Aplicación -->
+  <div class="app hidden" id="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2 data-system-name>Gestor-S</h2>
+        <p>Sistema de Gestión</p>
+      </div>
+      <nav>
+        <ul class="sidebar-menu" id="sidebarMenu">
+          <li data-section="dashboard" class="active"><span class="ico">📊</span> Inicio</li>
+          <li data-section="gestiones"><span class="ico">📋</span> Gestiones</li>
+          <li data-section="mapa"><span class="ico">🗺️</span> Mapa</li>
+          <li data-section="eventos"><span class="ico">📅</span> Eventos</li>
+          <li data-section="reportes"><span class="ico">📈</span> Reportes</li>
+          <li data-section="config"><span class="ico">⚙️</span> Configuración</li>
+        </ul>
+      </nav>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <main class="main">
+      <header class="header">
+        <button class="icon-btn" id="menuBtn" aria-label="Menú">☰</button>
+        <h1 id="pageTitle">Inicio</h1>
+        <button class="btn btn-outline" id="lockBtn">🔒 Bloquear</button>
+      </header>
+
+      <div class="banner hidden" id="backupBanner">
+        <span id="backupBannerText"></span>
+        <button class="btn btn-primary btn-sm" data-action="go-backup">Hacer respaldo</button>
+      </div>
+
+      <!-- INICIO -->
+      <section class="section active" id="dashboard">
+        <div class="cards" id="statusCards"></div>
+        <div class="grid-2">
+          <div class="panel">
+            <h3 class="panel-title">Gestiones por estatus</h3>
+            <p class="panel-hint">Toca una barra para ver esas gestiones.</p>
+            <canvas id="statusChart" class="chart"></canvas>
+          </div>
+          <div class="panel">
+            <h3 class="panel-title">Zonas con más gestiones</h3>
+            <p class="panel-hint">Toca un punto rojo para ver el mapa de calor y el reporte de esa colonia.</p>
+            <ul class="hot-list" id="hotList"></ul>
+          </div>
+        </div>
+        <div class="panel">
+          <h3 class="panel-title">Próximos eventos</h3>
+          <ul class="agenda-list" id="dashAgenda"></ul>
+        </div>
+        <div class="notice hidden" id="noLocationNotice"></div>
+      </section>
+
+      <!-- GESTIONES -->
+      <section class="section" id="gestiones">
+        <div class="panel">
+          <div class="toolbar">
+            <input type="search" class="input" id="gSearch" placeholder="Buscar por nombre, colonia, folio…">
+            <select class="input" id="gFilterEstatus"></select>
+            <select class="input" id="gFilterDependencia"></select>
+            <select class="input" id="gFilterFuente"></select>
+            <label class="check"><input type="checkbox" id="gFilterSinUbicacion"> Sin ubicación</label>
+            <button class="btn btn-primary" data-action="new-gestion">＋ Nueva gestión</button>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Folio</th><th>Solicitante</th><th>Dependencia</th><th>Fuente</th>
+                  <th>Ubicación</th><th>Estatus</th><th>Fechas</th><th class="num">Monto</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="gTableBody"></tbody>
+            </table>
+          </div>
+          <p class="table-foot" id="gCount"></p>
+        </div>
+      </section>
+
+      <!-- MAPA -->
+      <section class="section" id="mapa">
+        <div class="panel">
+          <div class="toolbar">
+            <select class="input" id="mView">
+              <option value="seccion">Vista por sección</option>
+              <option value="colonia">Vista por colonia</option>
+            </select>
+            <select class="input" id="mEstatus"></select>
+            <select class="input" id="mFuente"></select>
+            <select class="input" id="mDependencia"></select>
+            <select class="input" id="mTipo"></select>
+            <label class="inline-label">Desde <input type="date" class="input" id="mDesde"></label>
+            <label class="inline-label">Hasta <input type="date" class="input" id="mHasta"></label>
+          </div>
+          <div class="map-layout">
+            <div class="map-area" id="mapArea"></div>
+            <aside class="map-detail" id="mapDetail">
+              <p class="muted">Toca una zona del mapa para ver sus gestiones.</p>
+            </aside>
+          </div>
+          <div class="legend" id="mapLegend"></div>
+        </div>
+      </section>
+
+      <!-- EVENTOS -->
+      <section class="section" id="eventos">
+        <div class="grid-cal">
+          <div class="panel">
+            <div class="cal-header">
+              <button class="btn btn-outline" id="calPrev" aria-label="Mes anterior">‹</button>
+              <h3 id="calTitle"></h3>
+              <button class="btn btn-outline" id="calNext" aria-label="Mes siguiente">›</button>
+              <button class="btn btn-outline btn-sm" id="calToday">Hoy</button>
+              <button class="btn btn-primary" data-action="new-evento">＋ Nuevo evento</button>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+          </div>
+          <div class="panel">
+            <h3 class="panel-title" id="dayTitle">Agenda</h3>
+            <ul class="agenda-list" id="dayList"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- REPORTES -->
+      <section class="section" id="reportes">
+        <div class="panel">
+          <h3 class="panel-title">Filtros del reporte</h3>
+          <div class="filter-grid">
+            <label>Desde<input type="date" class="input" id="rDesde"></label>
+            <label>Hasta<input type="date" class="input" id="rHasta"></label>
+            <label>Fuente de ingreso<select class="input" id="rFuente"></select></label>
+            <label>Dependencia<select class="input" id="rDependencia"></select></label>
+            <label>Tipo de gestión<select class="input" id="rTipo"></select></label>
+            <label>Colonia<select class="input" id="rColonia"></select></label>
+            <label>Municipio<select class="input" id="rMunicipio"></select></label>
+            <label>Estatus<select class="input" id="rEstatus"></select></label>
+            <label>Agrupar por
+              <select class="input" id="rGroup">
+                <option value="colonia">Colonia</option>
+                <option value="seccion">Sección</option>
+                <option value="fuente">Fuente de ingreso</option>
+                <option value="dependencia">Dependencia</option>
+                <option value="tipo">Tipo de gestión</option>
+                <option value="estatus">Estatus</option>
+                <option value="municipio">Municipio</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button class="btn btn-outline" id="rClear">Limpiar filtros</button>
+            <button class="btn btn-success" id="rExcel">⬇ Exportar Excel</button>
+            <button class="btn btn-primary" id="rPdf">⬇ Exportar PDF</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h3 class="panel-title" id="rSummaryTitle">Resumen</h3>
+          <div class="table-wrap"><table class="table" id="rSummary"></table></div>
+        </div>
+        <div class="panel">
+          <h3 class="panel-title" id="rDetailTitle">Detalle</h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Folio</th><th>Solicitante</th><th>Dependencia</th><th>Tipo</th><th>Fuente</th>
+                  <th>Colonia</th><th>Sección</th><th>Estatus</th><th>Ingreso</th><th class="num">Monto</th>
+                </tr>
+              </thead>
+              <tbody id="rTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONFIGURACIÓN -->
+      <section class="section" id="config">
+        <div class="grid-2">
+          <div class="panel">
+            <h3 class="panel-title">General</h3>
+            <div class="form-group">
+              <label for="cfgName">Nombre del sistema</label>
+              <input type="text" class="input" id="cfgName" maxlength="40">
+            </div>
+            <div class="form-group">
+              <label>Tema de colores</label>
+              <div class="theme-options" id="themeOptions"></div>
+            </div>
+            <div class="form-group">
+              <label for="cfgLock">Bloquear automáticamente después de</label>
+              <select class="input" id="cfgLock">
+                <option value="1">1 minuto sin uso</option>
+                <option value="3">3 minutos sin uso</option>
+                <option value="5">5 minutos sin uso</option>
+                <option value="10">10 minutos sin uso</option>
+                <option value="15">15 minutos sin uso</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="cfgSaveGeneral">Guardar</button>
+          </div>
+
+          <div class="panel" id="backupPanel">
+            <h3 class="panel-title">Respaldo</h3>
+            <p class="muted" id="cfgLastBackup"></p>
+            <p class="muted">El respaldo es un archivo cifrado con tu contraseña. Guárdalo en Archivos o iCloud; sin la contraseña nadie puede leerlo.</p>
+            <div class="actions">
+              <button class="btn btn-success" id="cfgExport">⬇ Hacer respaldo</button>
+              <label class="btn btn-outline file-btn">⬆ Restaurar respaldo
+                <input type="file" id="cfgImport" accept=".json,application/json">
+              </label>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3 class="panel-title">Cambiar contraseña</h3>
+            <div class="form-group"><label for="cfgOldPass">Contraseña actual</label><input type="password" class="input" id="cfgOldPass" autocomplete="current-password"></div>
+            <div class="form-group"><label for="cfgNewPass">Nueva contraseña (mínimo 8)</label><input type="password" class="input" id="cfgNewPass" autocomplete="new-password"></div>
+            <div class="form-group"><label for="cfgNewPass2">Confirmar nueva contraseña</label><input type="password" class="input" id="cfgNewPass2" autocomplete="new-password"></div>
+            <button class="btn btn-primary" id="cfgChangePass">Cambiar contraseña</button>
+          </div>
+
+          <div class="panel">
+            <h3 class="panel-title">Cartografía del mapa</h3>
+            <p class="muted" id="cfgCartoStatus"></p>
+            <p class="muted">Archivo GeoJSON con los contornos de las secciones o de las colonias. Se guarda solo en este iPad.</p>
+            <div class="actions">
+              <label class="btn btn-outline file-btn">⬆ Cargar secciones
+                <input type="file" id="cfgCartoSeccion" accept=".geojson,.json,application/json,application/geo+json">
+              </label>
+              <label class="btn btn-outline file-btn">⬆ Cargar colonias
+                <input type="file" id="cfgCartoColonia" accept=".geojson,.json,application/json,application/geo+json">
+              </label>
+              <button class="btn btn-danger btn-sm" id="cfgCartoClear">Quitar cartografía</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel-title">Catálogos</h3>
+          <p class="muted">Una opción por línea. Lo que cambies aquí aparece en las listas de captura, filtros y reportes.</p>
+          <div class="grid-4">
+            <div class="form-group"><label for="catDependencias">Dependencias</label><textarea class="input" id="catDependencias" rows="10"></textarea></div>
+            <div class="form-group"><label for="catTipos">Tipos de gestión</label><textarea class="input" id="catTipos" rows="10"></textarea></div>
+            <div class="form-group"><label for="catFuentes">Fuentes de ingreso</label><textarea class="input" id="catFuentes" rows="10"></textarea></div>
+            <div class="form-group"><label for="catMunicipios">Municipios</label><textarea class="input" id="catMunicipios" rows="10"></textarea></div>
+          </div>
+          <button class="btn btn-primary" id="cfgSaveCatalogs">Guardar catálogos</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal: gestión -->
+  <div class="modal" id="gestionModal" aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="gModalTitle">Nueva gestión</h2>
+        <button class="icon-btn" data-close aria-label="Cerrar">✕</button>
+      </div>
+      <form id="gestionForm" autocomplete="off">
+        <fieldset>
+          <legend>Datos del solicitante</legend>
+          <div class="form-row">
+            <div class="form-group"><label for="fSolicitante">Nombre</label><input class="input" id="fSolicitante"></div>
+            <div class="form-group"><label for="fTelefono">Teléfono</label><input class="input" id="fTelefono" type="tel"></div>
+          </div>
+          <div class="form-row three">
+            <div class="form-group"><label for="fMunicipio">Municipio</label><select class="input" id="fMunicipio"></select></div>
+            <div class="form-group"><label for="fColonia">Colonia</label><input class="input" id="fColonia" list="coloniasList"></div>
+            <div class="form-group"><label for="fSeccion">Sección</label><input class="input" id="fSeccion" inputmode="numeric" list="seccionesList"></div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Datos de la gestión</legend>
+          <div class="form-row">
+            <div class="form-group"><label for="fDependencia">Dependencia</label><select class="input" id="fDependencia"></select></div>
+            <div class="form-group"><label for="fTipo">Tipo de gestión</label><select class="input" id="fTipo"></select></div>
+          </div>
+          <div class="form-row three">
+            <div class="form-group"><label for="fFuente">Fuente de ingreso</label><select class="input" id="fFuente"></select></div>
+            <div class="form-group"><label for="fMonto">Monto estimado ($)</label><input class="input" id="fMonto" type="number" step="0.01" min="0" inputmode="decimal"></div>
+            <div class="form-group"><label for="fEstatus">Estatus</label><select class="input" id="fEstatus"></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="fFechaIngreso">Fecha de ingreso</label><input class="input" id="fFechaIngreso" type="date"></div>
+            <div class="form-group"><label>Última actualización</label><input class="input" id="fFechaAct" disabled></div>
+          </div>
+          <div class="form-group"><label for="fDescripcion">Descripción</label><textarea class="input" id="fDescripcion" rows="3"></textarea></div>
+        </fieldset>
+        <div class="linked hidden" id="gLinkedEvents"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline hidden" id="gScheduleBtn">📅 Agendar evento</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-outline" data-close>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: evento -->
+  <div class="modal" id="eventoModal" aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="eModalTitle">Nuevo evento</h2>
+        <button class="icon-btn" data-close aria-label="Cerrar">✕</button>
+      </div>
+      <form id="eventoForm" autocomplete="off">
+        <div class="form-group"><label for="eTitulo">Título</label><input class="input" id="eTitulo"></div>
+        <div class="form-row three">
+          <div class="form-group"><label for="eFecha">Fecha</label><input class="input" id="eFecha" type="date"></div>
+          <div class="form-group"><label for="eHora">Hora</label><input class="input" id="eHora" type="time"></div>
+          <div class="form-group"><label for="eColonia">Colonia</label><input class="input" id="eColonia" list="coloniasList"></div>
+        </div>
+        <div class="form-group"><label for="eLugar">Lugar</label><input class="input" id="eLugar"></div>
+        <div class="form-group"><label for="eDescripcion">Descripción</label><textarea class="input" id="eDescripcion" rows="2"></textarea></div>
+        <div class="form-group">
+          <label>Gestiones vinculadas</label>
+          <div class="link-tools">
+            <input type="search" class="input" id="eLinkSearch" placeholder="Buscar gestión…">
+            <button type="button" class="btn btn-outline btn-sm" id="eLinkByColonia">Vincular las de esta colonia</button>
+          </div>
+          <div class="link-list" id="eLinkList"></div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger hidden" id="eDeleteBtn">Eliminar</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-outline" data-close>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar evento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Confirmación -->
+  <div class="modal" id="confirmModal" aria-hidden="true">
+    <div class="modal-content modal-sm">
+      <p id="confirmText"></p>
+      <div class="modal-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-outline" id="confirmNo">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="confirmYes">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <!-- Área de impresión (PDF) -->
+  <div id="printArea" class="print-area"></div>
+
+  <datalist id="coloniasList"></datalist>
+  <datalist id="seccionesList"></datalist>
+
+  <script src="js/vault.js"></script>
+  <script src="js/xlsx.js"></script>
+  <script src="js/mapa.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
